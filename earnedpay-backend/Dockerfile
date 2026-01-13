@@ -1,4 +1,5 @@
-FROM python:3.13-slim
+# Using Python 3.11 to ensure compatibility with pre-built wheels for pydantic and others
+FROM python:3.11-slim
 
 WORKDIR /app
 
