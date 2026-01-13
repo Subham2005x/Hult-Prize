@@ -70,10 +70,10 @@ export default function HomePage() {
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Button size="lg" className="h-14 px-8 text-lg rounded-full shadow-lg hover:shadow-xl transition-all" onClick={() => handleRoleSelect('worker')}>
-                            Launch Worker Demo
+                            For Worker
                         </Button>
                         <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-2" onClick={() => handleRoleSelect('employer')}>
-                            Launch Employer Demo
+                            For Employer
                         </Button>
                     </div>
                 </div>
