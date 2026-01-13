@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isWorker() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'worker';
+    }
+    
+    function isEmployer() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employer';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+    
+    // Workers collection
+    match /workers/{workerId} {
+      allow read: if isOwner(workerId) || 
+                     (isEmployer() && resource.data.employerId == request.auth.uid);
+      allow create: if isEmployer();
+      allow update: if isEmployer() && resource.data.employerId == request.auth.uid;
+      allow delete: if false;
+    }
+    
+    // Employers collection
+    match /employers/{employerId} {
+      allow read, write: if isOwner(employerId);
+      allow delete: if false;
+    }
+    
+    // Attendance collection
+    match /attendance/{attendanceId} {
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid ||
+                     isEmployer() && resource.data.employerId == request.auth.uid;
+      allow create: if isEmployer();
+      allow update, delete: if false;
+    }
+    
+    // Wage ledgers collection
+    match /wage_ledgers/{ledgerId} {
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid ||
+                     isEmployer() && resource.data.employerId == request.auth.uid;
+      allow create: if isEmployer();
+      allow update: if isEmployer() && resource.data.employerId == request.auth.uid;
+      allow delete: if false;
+    }
+    
+    // Withdrawals collection
+    match /withdrawals/{withdrawalId} {
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid ||
+                     isEmployer() && resource.data.employerId == request.auth.uid;
+      allow create: if isWorker() && request.resource.data.workerId == request.auth.uid;
+      allow update: if false; // Only backend can update
+      allow delete: if false;
+    }
+    
+    // Settlements collection
+    match /settlements/{settlementId} {
+      allow read: if isEmployer() && resource.data.employerId == request.auth.uid;
+      allow create: if isEmployer() && request.resource.data.employerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}
