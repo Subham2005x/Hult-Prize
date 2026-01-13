@@ -50,9 +50,9 @@ async def get_worker_balance(current_user: dict = Depends(get_current_user)):
     # Get current month's wage ledger
     current_month = datetime.utcnow().strftime("%Y-%m")
     ledger_query = firebase_service.db.collection('wage_ledgers') \
-        .where('workerId', '==', worker_id) \
-        .where('month', '==', current_month) \
-        .where('status', '==', 'active') \
+        .where(field_path='workerId', op_string='==', value=worker_id) \
+        .where(field_path='month', op_string='==', value=current_month) \
+        .where(field_path='status', op_string='==', value='active') \
         .limit(1)
     
     ledger_docs = ledger_query.get()
@@ -118,7 +118,7 @@ async def get_withdrawal_history(
     
     # Query withdrawals
     withdrawals_query = firebase_service.db.collection('withdrawals') \
-        .where('workerId', '==', worker_id) \
+        .where(field_path='workerId', op_string='==', value=worker_id) \
         .order_by('requestedAt', direction='DESCENDING') \
         .limit(limit)
     
@@ -153,9 +153,9 @@ async def request_withdrawal(
     # Get employer config for limits
     current_month = datetime.utcnow().strftime("%Y-%m")
     ledger_query = firebase_service.db.collection('wage_ledgers') \
-        .where('workerId', '==', worker_id) \
-        .where('month', '==', current_month) \
-        .where('status', '==', 'active') \
+        .where(field_path='workerId', op_string='==', value=worker_id) \
+        .where(field_path='month', op_string='==', value=current_month) \
+        .where(field_path='status', op_string='==', value='active') \
         .limit(1)
     
     ledger_docs = ledger_query.get()
