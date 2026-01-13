@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult } from 'firebase/auth';
+import { signInWithPhoneNumber, RecaptchaVerifier, ConfirmationResult, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -71,7 +71,6 @@ function LoginForm() {
         setError('');
         setLoading(true);
         try {
-            const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
             const provider = new GoogleAuthProvider();
             const result = await signInWithPopup(auth, provider);
             const idToken = await result.user.getIdToken();
@@ -92,11 +91,11 @@ function LoginForm() {
                 useAuthStore.getState().setLoading(false);
             }
 
-            // Force hard navigation
+            // Navigate to dashboard
             if (actualRole === 'worker') {
-                window.location.href = '/worker/dashboard';
+                router.replace('/worker/dashboard');
             } else if (actualRole === 'employer') {
-                window.location.href = '/employer/dashboard';
+                router.replace('/employer/dashboard');
             } else {
                 setError('Unknown user role. Please contact support.');
                 setLoading(false);
@@ -133,11 +132,11 @@ function LoginForm() {
                 useAuthStore.getState().setLoading(false);
             }
 
-            // Force hard navigation
+            // Navigate to dashboard
             if (actualRole === 'worker') {
-                window.location.href = '/worker/dashboard';
+                router.replace('/worker/dashboard');
             } else if (actualRole === 'employer') {
-                window.location.href = '/employer/dashboard';
+                router.replace('/employer/dashboard');
             } else {
                 setError('Unknown user role. Please contact support.');
                 setLoading(false);
