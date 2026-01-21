@@ -15,4 +15,4 @@ EXPOSE 8000
 # Command to run the application using gunicorn with uvicorn workers
 # We use shell form to allow variable expansion if needed, but array form is safer.
 # We'll use a common pattern compatible with Render's expectation of $PORT.
-CMD ["sh", "-c", "gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:${PORT:-8000}"]
+CMD ["sh", "-c", "gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${WEB_CONCURRENCY:-1} -b 0.0.0.0:${PORT:-8000} --timeout 120"]
