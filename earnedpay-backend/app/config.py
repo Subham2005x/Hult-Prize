@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     debug: bool = True
     
     # CORS
-    allowed_origins: str = "http://localhost:3000"
+    allowed_origins: str = "http://localhost:3000,https://earnedpay-d84b8.web.app"
     
     # UPI
     upi_mock_mode: bool = True
