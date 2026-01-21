@@ -5,8 +5,13 @@ from datetime import datetime
 
 class WorkerBase(BaseModel):
     full_name: str
-    phone_number: str = Field(..., pattern=r"^\+91\d{10}$")
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
     upi_id: str
+    
+    class Config:
+        # Allow empty strings to be treated as None
+        validate_assignment = True
 
 
 class WorkerCreate(WorkerBase):
@@ -41,3 +46,8 @@ class UpdateUPI(BaseModel):
 
 class UpdatePassword(BaseModel):
     password: str = Field(..., min_length=4)
+
+
+class UpdateProfile(BaseModel):
+    full_name: Optional[str] = None
+    upi_id: Optional[str] = Field(None, pattern=r"^[\w.-]+@[\w.-]+$")

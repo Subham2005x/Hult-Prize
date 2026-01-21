@@ -59,6 +59,15 @@ export const api = {
         getWithdrawals: (token: string) =>
             apiRequest('/api/workers/me/withdrawals', { token }),
 
+
+
+        updateProfile: (token: string, data: any) =>
+            apiRequest('/api/workers/me', {
+                method: 'PUT',
+                body: data,
+                token,
+            }),
+
         requestWithdrawal: (token: string, data: { amount: number; upi_id: string }) =>
             apiRequest('/api/workers/me/withdraw', {
                 method: 'POST',

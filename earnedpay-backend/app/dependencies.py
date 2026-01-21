@@ -12,6 +12,7 @@ async def get_firebase_user(authorization: Optional[str] = Header(None)) -> dict
     Dependency to verify Firebase ID token only
     """
     if not authorization:
+        logger.warning("❌ Missing authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authorization header"
@@ -20,29 +21,36 @@ async def get_firebase_user(authorization: Optional[str] = Header(None)) -> dict
     try:
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
+            logger.warning(f"❌ Invalid auth scheme: {scheme}")
             raise ValueError("Invalid authentication scheme")
-    except ValueError:
+    except ValueError as e:
+        logger.warning(f"❌ Invalid authorization header format: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format"
         )
     
+    logger.info(f"🔑 Verifying Firebase token (length: {len(token)})")
     decoded_token = await firebase_service.verify_token(token)
     if not decoded_token:
+        logger.error("❌ Firebase token verification failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
     
+    logger.info(f"✅ Token verified for UID: {decoded_token.get('uid')}")
     return decoded_token
 
 
 async def get_current_user(firebase_user: dict = Depends(get_firebase_user)) -> dict:
     """
-    Dependency to get current authenticated user from Firestore
+    Dependency to get current authenticated user from MongoDB
     """
+    from app.services.mongodb_service import mongodb_service
+    
     uid = firebase_user.get("uid")
-    user = await firebase_service.get_user(uid)
+    user = await mongodb_service.get_user(uid)
     
     if not user:
         raise HTTPException(

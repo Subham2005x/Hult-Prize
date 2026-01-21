@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguageStore } from '@/store/languageStore';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +31,7 @@ import { api } from '@/lib/api';
 export default function WorkerProfile() {
     const router = useRouter();
     const { user, token, role, profile, loading, logout, setProfile } = useAuth();
+    const { t } = useLanguageStore();
     const [activeTab, setActiveTab] = useState('profile');
 
     // Password Update State
@@ -64,11 +66,34 @@ export default function WorkerProfile() {
         }
     };
 
+    const [workerData, setWorkerData] = useState<any>(null);
+
     useEffect(() => {
         if (!loading && (!user || role !== 'worker')) {
             router.push('/login');
         }
     }, [user, role, loading, router]);
+
+    useEffect(() => {
+        if (token) {
+            fetchWorkerProfile();
+        }
+    }, [token]);
+
+    const fetchWorkerProfile = async () => {
+        try {
+            const data = await api.worker.getProfile(token!);
+            setWorkerData(data);
+            // Also update the auth store profile to keep everything in sync
+            setProfile((prev: any) => ({ ...prev, ...data }));
+
+            // Set initial form values
+            if (data.upiId) setNewUpi(data.upiId);
+
+        } catch (error) {
+            console.error("Failed to fetch worker profile", error);
+        }
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -113,8 +138,8 @@ export default function WorkerProfile() {
             <header className="bg-background/80 backdrop-blur-md border-b sticky top-0 z-20 shadow-sm transition-colors duration-300">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-bold">Profile</h1>
-                        <p className="text-xs text-muted-foreground">Manage your account</p>
+                        <h1 className="text-xl font-bold">{t('profile')}</h1>
+                        <p className="text-xs text-muted-foreground">{t('manageAccount')}</p>
                     </div>
                     <ThemeToggle />
                 </div>
@@ -127,10 +152,10 @@ export default function WorkerProfile() {
                     <CardContent className="pt-6 relative z-10">
                         <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold backdrop-blur-sm">
-                                {user?.phoneNumber?.slice(-2) || 'WK'}
+                                {workerData?.fullName?.charAt(0) || user?.phoneNumber?.slice(-2) || 'WK'}
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold">Worker Account</h2>
+                                <h2 className="text-2xl font-bold">{workerData?.fullName || t('workerAccount')}</h2>
                                 <p className="text-primary-100 flex items-center gap-2">
                                     <Phone className="w-4 h-4" /> {user?.phoneNumber || user?.email}
                                 </p>
@@ -147,34 +172,34 @@ export default function WorkerProfile() {
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <User className="w-5 h-5 text-primary" />
-                                Account Credentials
+                                {t('accountCredentials')}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <Label>Worker ID</Label>
+                                    <Label>{t('workerId')}</Label>
                                     <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-lg border">
                                         <BadgeCheck className="w-4 h-4 text-primary" />
-                                        <span className="font-mono font-bold text-sm overflow-hidden text-ellipsis whitespace-nowrap" title={profile?.customId}>{profile?.customId || 'Loading...'}</span>
+                                        <span className="font-mono font-bold text-sm overflow-hidden text-ellipsis whitespace-nowrap" title={workerData?.customId}>{workerData?.customId || profile?.customId || 'Loading...'}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label>UPI ID (for Payouts)</Label>
+                                    <Label>UPI ID</Label>
                                     {isEditingUpi ? (
                                         <div className="space-y-2 p-3 bg-secondary/30 rounded-lg border animate-fade-in">
                                             <Input
                                                 type="text"
                                                 value={newUpi}
                                                 onChange={(e) => setNewUpi(e.target.value)}
-                                                placeholder="user@upi"
+                                                placeholder={t('upiIdPlaceholder')}
                                                 className="bg-background"
                                                 autoFocus
                                             />
                                             <div className="flex gap-2 justify-end">
-                                                <Button variant="ghost" size="sm" onClick={() => setIsEditingUpi(false)} disabled={isLoadingUpi}>Cancel</Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setIsEditingUpi(false)} disabled={isLoadingUpi}>{t('cancel')}</Button>
                                                 <Button size="sm" onClick={handleUpiChange} disabled={isLoadingUpi}>
-                                                    {isLoadingUpi ? 'Saving...' : 'Save'}
+                                                    {isLoadingUpi ? t('saving') : t('save')}
                                                 </Button>
                                             </div>
                                         </div>
@@ -182,14 +207,14 @@ export default function WorkerProfile() {
                                         <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-lg border justify-between">
                                             <div className="flex items-center gap-2">
                                                 <CreditCard className="w-4 h-4 text-muted-foreground" />
-                                                <span className="font-mono text-sm">{profile?.upiId || 'Not set'}</span>
+                                                <span className="font-mono text-sm">{workerData?.upiId || profile?.upiId || t('notSet')}</span>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => { setNewUpi(profile?.upiId || ''); setIsEditingUpi(true); }}>Change</Button>
+                                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => { setNewUpi(workerData?.upiId || profile?.upiId || ''); setIsEditingUpi(true); }}>{t('change')}</Button>
                                         </div>
                                     )}
                                 </div>
                                 <div className="space-y-1">
-                                    <Label>Password</Label>
+                                    <Label>{t('password')}</Label>
                                     {isEditingPassword ? (
                                         <div className="space-y-2 p-3 bg-secondary/30 rounded-lg border animate-fade-in">
                                             <Input
@@ -201,9 +226,9 @@ export default function WorkerProfile() {
                                                 autoFocus
                                             />
                                             <div className="flex gap-2 justify-end">
-                                                <Button variant="ghost" size="sm" onClick={() => setIsEditingPassword(false)} disabled={isLoadingPassword}>Cancel</Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setIsEditingPassword(false)} disabled={isLoadingPassword}>{t('cancel')}</Button>
                                                 <Button size="sm" onClick={handlePasswordChange} disabled={isLoadingPassword}>
-                                                    {isLoadingPassword ? 'Saving...' : 'Save'}
+                                                    {isLoadingPassword ? t('saving') : t('save')}
                                                 </Button>
                                             </div>
                                         </div>
@@ -213,7 +238,7 @@ export default function WorkerProfile() {
                                                 <Key className="w-4 h-4 text-muted-foreground" />
                                                 <span className="font-mono text-sm">{profile?.password || '••••'}</span>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setIsEditingPassword(true)}>Change</Button>
+                                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setIsEditingPassword(true)}>{t('change')}</Button>
                                         </div>
                                     )}
                                 </div>
@@ -226,15 +251,15 @@ export default function WorkerProfile() {
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <Building className="w-5 h-5 text-primary" />
-                                Employment Details
+                                {t('employmentDetails')}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-1">
-                                <Label>Company</Label>
+                                <Label>{t('company')}</Label>
                                 <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-lg border">
                                     <Building className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">Tech Corp Industries</span>
+                                    <span className="font-medium">{workerData?.companyName || 'Loading...'}</span>
                                 </div>
                             </div>
                         </CardContent>
@@ -243,7 +268,7 @@ export default function WorkerProfile() {
                     {/* Application Settings */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg font-semibold">General</CardTitle>
+                            <CardTitle className="text-lg font-semibold">{t('general')}</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y">
@@ -252,7 +277,7 @@ export default function WorkerProfile() {
                                         <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
                                             <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                         </div>
-                                        <span className="font-medium">Notifications</span>
+                                        <span className="font-medium">{t('notifications')}</span>
                                     </div>
                                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                                 </button>
@@ -262,7 +287,7 @@ export default function WorkerProfile() {
                                         <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
                                             <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
                                         </div>
-                                        <span className="font-medium">Privacy & Security</span>
+                                        <span className="font-medium">{t('privacySecurity')}</span>
                                     </div>
                                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                                 </button>
@@ -272,7 +297,7 @@ export default function WorkerProfile() {
                                         <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
                                             <HelpCircle className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                                         </div>
-                                        <span className="font-medium">Help & Support</span>
+                                        <span className="font-medium">{t('helpSupport')}</span>
                                     </div>
                                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                                 </button>
@@ -288,7 +313,7 @@ export default function WorkerProfile() {
                         onClick={handleLogout}
                     >
                         <LogOut className="w-4 h-4 mr-2" />
-                        Logout
+                        {t('logout')}
                     </Button>
                 </div>
             </main>
@@ -302,7 +327,7 @@ export default function WorkerProfile() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <Home className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Home</span>
+                                <span className="text-[10px] font-medium">{t('home')}</span>
                             </button>
                         </Link>
 
@@ -311,7 +336,7 @@ export default function WorkerProfile() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <CreditCard className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Withdraw</span>
+                                <span className="text-[10px] font-medium">{t('withdraw')}</span>
                             </button>
                         </Link>
 
@@ -320,7 +345,7 @@ export default function WorkerProfile() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <History className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">History</span>
+                                <span className="text-[10px] font-medium">{t('history')}</span>
                             </button>
                         </Link>
 
@@ -329,7 +354,7 @@ export default function WorkerProfile() {
                         >
                             <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                             <User className="w-6 h-6 transition-transform duration-300 scale-110" />
-                            <span className="text-[10px] font-medium">Profile</span>
+                            <span className="text-[10px] font-medium">{t('profile')}</span>
                         </button>
                     </div>
                 </div>

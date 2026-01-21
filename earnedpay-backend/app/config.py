@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     firebase_credentials: str
     firebase_project_id: str
     
+    # MongoDB Atlas
+    mongodb_url: str
+    
     # Environment
     environment: str = "development"
     debug: bool = True

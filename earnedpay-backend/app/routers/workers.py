@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies import get_current_user
-from app.models.worker import WorkerBalance, UpdateUPI, UpdatePassword
+from app.models.worker import WorkerBalance, UpdateUPI, UpdatePassword, UpdateProfile
 from app.models.withdrawal import WithdrawalRequest, WithdrawalResponse
-from app.services.firebase_service import firebase_service
+from app.services.firebase_service import firebase_service  # Auth only
+from app.services.mongodb_service import mongodb_service  # Data storage
 from app.services.wage_calculator import wage_calculator
 from app.services.upi_service import upi_service
 from app.services.notification_service import notification_service
@@ -23,17 +24,24 @@ async def get_worker_profile(current_user: dict = Depends(get_current_user)):
             detail="Access denied. Worker role required."
         )
     
-    # Get worker details from Firestore
-    worker_ref = firebase_service.db.collection('workers').document(current_user["uid"])
-    worker_doc = worker_ref.get()
+    # Get worker details from MongoDB
+    worker = await mongodb_service.get_worker(current_user["uid"])
     
-    if not worker_doc.exists:
+    if not worker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Worker profile not found"
         )
     
-    return {"id": current_user["uid"], **worker_doc.to_dict()}
+    # Get employer details to include company name
+    employer = await mongodb_service.get_employer(worker.get('employerId'))
+    company_name = employer.get('companyName', 'Unknown Company') if employer else 'Unknown Company'
+    
+    return {
+        "id": current_user["uid"], 
+        **worker,
+        "companyName": company_name  # Add company name for worker dashboard
+    }
 
 
 @router.get("/me/balance", response_model=WorkerBalance)
@@ -47,18 +55,11 @@ async def get_worker_balance(current_user: dict = Depends(get_current_user)):
     
     worker_id = current_user["uid"]
     
-    # Get current month's wage ledger
-    current_month = datetime.utcnow().strftime("%Y-%m")
-    ledger_query = firebase_service.db.collection('wage_ledgers') \
-        .where(field_path='workerId', op_string='==', value=worker_id) \
-        .where(field_path='month', op_string='==', value=current_month) \
-        .where(field_path='status', op_string='==', value='active') \
-        .limit(1)
+    # Get wage ledger from MongoDB
+    ledger = await mongodb_service.get_wage_ledger(worker_id)
     
-    ledger_docs = ledger_query.get()
-    
-    if not ledger_docs:
-        # No earnings yet this month
+    if not ledger:
+        # No earnings yet
         return WorkerBalance(
             total_earned=0.0,
             total_withdrawn=0.0,
@@ -68,20 +69,15 @@ async def get_worker_balance(current_user: dict = Depends(get_current_user)):
             payday_amount=0.0
         )
     
-    ledger_data = ledger_docs[0].to_dict()
-    
     # Get employer's withdrawal config
-    employer_ref = firebase_service.db.collection('employers').document(ledger_data['employerId'])
-    employer_doc = employer_ref.get()
-    employer_data = employer_doc.to_dict() if employer_doc.exists else {}
-    
-    withdrawal_config = employer_data.get('withdrawalConfig', {})
+    employer = await mongodb_service.get_employer(ledger['employerId'])
+    withdrawal_config = employer.get('withdrawalConfig', {}) if employer else {}
     max_percentage = withdrawal_config.get('maxPercentage', 40)
     
     # Calculate available balance
     balance_info = wage_calculator.calculate_available_balance(
-        total_earned=ledger_data.get('totalEarned', 0.0),
-        total_withdrawn=ledger_data.get('totalWithdrawn', 0.0),
+        total_earned=ledger.get('totalEarned', 0.0),
+        total_withdrawn=ledger.get('totalWithdrawn', 0.0),
         max_percentage=max_percentage
     )
     
@@ -116,21 +112,10 @@ async def get_withdrawal_history(
     
     worker_id = current_user["uid"]
     
-    # Query withdrawals
-    withdrawals_query = firebase_service.db.collection('withdrawals') \
-        .where(field_path='workerId', op_string='==', value=worker_id) \
-        .order_by('requestedAt', direction='DESCENDING') \
-        .limit(limit)
+    # Query withdrawals from MongoDB
+    withdrawals = await mongodb_service.get_worker_withdrawals(worker_id)
     
-    withdrawals = []
-    for doc in withdrawals_query.get():
-        withdrawal_data = doc.to_dict()
-        withdrawals.append({
-            "id": doc.id,
-            **withdrawal_data
-        })
-    
-    return {"withdrawals": withdrawals}
+    return {"withdrawals": withdrawals[:limit]}
 
 
 @router.post("/me/withdraw", response_model=WithdrawalResponse)
@@ -150,28 +135,16 @@ async def request_withdrawal(
     # Get current balance
     balance_response = await get_worker_balance(current_user)
     
-    # Get employer config for limits
-    current_month = datetime.utcnow().strftime("%Y-%m")
-    ledger_query = firebase_service.db.collection('wage_ledgers') \
-        .where(field_path='workerId', op_string='==', value=worker_id) \
-        .where(field_path='month', op_string='==', value=current_month) \
-        .where(field_path='status', op_string='==', value='active') \
-        .limit(1)
-    
-    ledger_docs = ledger_query.get()
-    if not ledger_docs:
+    # Get ledger and employer config
+    ledger = await mongodb_service.get_wage_ledger(worker_id)
+    if not ledger:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active wage ledger found"
         )
     
-    ledger_doc = ledger_docs[0]
-    ledger_data = ledger_doc.to_dict()
-    
-    employer_ref = firebase_service.db.collection('employers').document(ledger_data['employerId'])
-    employer_doc = employer_ref.get()
-    employer_data = employer_doc.to_dict() if employer_doc.exists else {}
-    withdrawal_config = employer_data.get('withdrawalConfig', {})
+    employer = await mongodb_service.get_employer(ledger['employerId'])
+    withdrawal_config = employer.get('withdrawalConfig', {}) if employer else {}
     
     # Validate withdrawal amount
     is_valid, error_message = wage_calculator.validate_withdrawal_amount(
@@ -188,21 +161,15 @@ async def request_withdrawal(
         )
     
     # Create withdrawal record
-    withdrawal_id = str(uuid.uuid4())
     withdrawal_data = {
-        "workerId": worker_id,
-        "employerId": ledger_data['employerId'],
+        "worker_id": worker_id,
+        "employer_id": ledger['employerId'],
         "amount": withdrawal_request.amount,
-        "upiId": withdrawal_request.upi_id,
-        "status": "processing",
-        "requestedAt": datetime.utcnow(),
-        "ledgerId": ledger_doc.id,
-        "feeAmount": 0.0
+        "upi_id": withdrawal_request.upi_id,
+        "status": "processing"
     }
     
-    # Save to Firestore
-    withdrawal_ref = firebase_service.db.collection('withdrawals').document(withdrawal_id)
-    withdrawal_ref.set(withdrawal_data)
+    withdrawal_id = await mongodb_service.create_withdrawal(withdrawal_data)
     
     # Process UPI payout
     try:
@@ -214,18 +181,14 @@ async def request_withdrawal(
         
         if payout_result["success"]:
             # Update withdrawal status
-            withdrawal_ref.update({
+            await mongodb_service.update_withdrawal(withdrawal_id, {
                 "status": "completed",
                 "completedAt": datetime.utcnow(),
                 "transactionId": payout_result["transaction_id"]
             })
             
-            # Update ledger
-            ledger_doc.reference.update({
-                "totalWithdrawn": ledger_data.get('totalWithdrawn', 0.0) + withdrawal_request.amount,
-                "availableBalance": ledger_data.get('availableBalance', 0.0) - withdrawal_request.amount,
-                "updatedAt": datetime.utcnow()
-            })
+            # Update ledger (atomic operation)
+            await mongodb_service.record_withdrawal(worker_id, withdrawal_request.amount)
             
             # Send notification
             await notification_service.send_withdrawal_confirmation(
@@ -238,12 +201,12 @@ async def request_withdrawal(
                 id=withdrawal_id,
                 amount=withdrawal_request.amount,
                 status="completed",
-                requested_at=withdrawal_data["requestedAt"],
+                requested_at=datetime.utcnow(),
                 message=f"Successfully transferred ₹{withdrawal_request.amount} to {withdrawal_request.upi_id}"
             )
         else:
             # Payout failed
-            withdrawal_ref.update({
+            await mongodb_service.update_withdrawal(withdrawal_id, {
                 "status": "failed",
                 "failureReason": payout_result.get("message", "Payout failed")
             })
@@ -255,7 +218,7 @@ async def request_withdrawal(
     
     except Exception as e:
         logger.error(f"Withdrawal processing error: {e}")
-        withdrawal_ref.update({
+        await mongodb_service.update_withdrawal(withdrawal_id, {
             "status": "failed",
             "failureReason": str(e)
         })
@@ -263,6 +226,45 @@ async def request_withdrawal(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Withdrawal processing failed"
         )
+
+
+@router.put("/me")
+async def update_worker_profile(
+    profile_update: UpdateProfile,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update worker's profile (name and UPI) - syncs with employer view"""
+    if current_user.get("role") != "worker":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Worker role required."
+        )
+    
+    worker_id = current_user["uid"]
+    
+    # Build update dict from provided fields
+    update_data = {}
+    if profile_update.full_name is not None:
+        update_data["fullName"] = profile_update.full_name
+    if profile_update.upi_id is not None:
+        update_data["upiId"] = profile_update.upi_id
+    
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update"
+        )
+    
+    # Update in MongoDB workers collection (syncs with employer view)
+    await mongodb_service.update_worker(worker_id, update_data)
+    
+    logger.info(f"Worker profile updated: {worker_id}, fields: {list(update_data.keys())}")
+    
+    return {
+        "success": True,
+        "message": "Profile updated successfully",
+        "updated_fields": list(update_data.keys())
+    }
 
 
 @router.put("/me/upi")
@@ -279,18 +281,14 @@ async def update_upi_id(
     
     worker_id = current_user["uid"]
     
-    # Update in workers collection
-    worker_ref = firebase_service.db.collection('workers').document(worker_id)
-    worker_ref.update({
-        "upiId": upi_update.upi_id,
-        "updatedAt": datetime.utcnow()
+    # Update in MongoDB workers collection
+    await mongodb_service.update_worker(worker_id, {
+        "upiId": upi_update.upi_id
     })
     
     # Update in users collection
-    user_ref = firebase_service.db.collection('users').document(worker_id)
-    user_ref.update({
-        "upiId": upi_update.upi_id,
-        "updatedAt": datetime.utcnow()
+    await mongodb_service.update_user(worker_id, {
+        "upiId": upi_update.upi_id
     })
     
     return {
@@ -314,11 +312,9 @@ async def update_password(
     
     worker_id = current_user["uid"]
     
-    # Update in users collection
-    user_ref = firebase_service.db.collection('users').document(worker_id)
-    user_ref.update({
-        "password": password_update.password,
-        "updatedAt": datetime.utcnow()
+    # Update in MongoDB users collection
+    await mongodb_service.update_user(worker_id, {
+        "password": password_update.password
     })
     
     return {

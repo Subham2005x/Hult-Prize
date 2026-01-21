@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies import get_current_user
 from app.models.employer import EmployerDashboard, AttendanceSubmit, EmployerUpdate
 from app.models.worker import WorkerCreate
-from app.services.firebase_service import firebase_service
+from app.services.firebase_service import firebase_service  # Auth only
+from app.services.mongodb_service import mongodb_service  # Data storage
 from app.services.wage_calculator import wage_calculator
 from datetime import datetime
-import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,16 +21,15 @@ async def get_employer_profile(current_user: dict = Depends(get_current_user)):
             detail="Access denied. Employer role required."
         )
     
-    employer_ref = firebase_service.db.collection('employers').document(current_user["uid"])
-    employer_doc = employer_ref.get()
+    employer = await mongodb_service.get_employer(current_user["uid"])
     
-    if not employer_doc.exists:
+    if not employer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Employer profile not found"
         )
     
-    return {"id": current_user["uid"], **employer_doc.to_dict()}
+    return {"id": current_user["uid"], **employer}
 
 
 @router.put("/me")
@@ -45,10 +44,9 @@ async def update_employer_profile(
             detail="Access denied. Employer role required."
         )
     
-    employer_ref = firebase_service.db.collection('employers').document(current_user["uid"])
-    employer_doc = employer_ref.get()
+    employer = await mongodb_service.get_employer(current_user["uid"])
     
-    if not employer_doc.exists:
+    if not employer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Employer profile not found"
@@ -56,25 +54,21 @@ async def update_employer_profile(
         
     update_dict = update_data.model_dump(exclude_unset=True)
     
-    # Map snake_case to camelCase for Firestore if needed, or keep consistent. 
-    # Current codebase seems to mix, but let's stick to camelCase for Firestore fields used in frontend often, 
-    # but the model uses snake_case. Let's map key fields.
-    firestore_update = {}
+    # Map to MongoDB field names
+    mongodb_update = {}
     if 'company_name' in update_dict:
-        firestore_update['companyName'] = update_dict['company_name']
+        mongodb_update['companyName'] = update_dict['company_name']
     if 'phone_number' in update_dict:
-        firestore_update['phoneNumber'] = update_dict['phone_number']
+        mongodb_update['phoneNumber'] = update_dict['phone_number']
     if 'gst_number' in update_dict:
-        firestore_update['gstNumber'] = update_dict['gst_number']
+        mongodb_update['gstNumber'] = update_dict['gst_number']
     if 'withdrawal_config' in update_dict:
-        firestore_update['withdrawalConfig'] = update_dict['withdrawal_config']
+        mongodb_update['withdrawalConfig'] = update_dict['withdrawal_config']
         
-    if firestore_update:
-        firestore_update['updatedAt'] = datetime.utcnow()
-        employer_ref.update(firestore_update)
+    if mongodb_update:
+        await mongodb_service.update_employer(current_user["uid"], mongodb_update)
         
     return {"success": True, "message": "Profile updated successfully"}
-
 
 
 @router.get("/me/workers")
@@ -87,18 +81,11 @@ async def list_workers(current_user: dict = Depends(get_current_user)):
         )
     
     employer_id = current_user["uid"]
+    workers = await mongodb_service.get_employer_workers(employer_id)
     
-    workers_query = firebase_service.db.collection('workers') \
-        .where('employerId', '==', employer_id) \
-        .where('isActive', '==', True)
-    
-    workers = []
-    for doc in workers_query.get():
-        worker_data = doc.to_dict()
-        workers.append({
-            "id": doc.id,
-            **worker_data
-        })
+    # Add id field from _id
+    for worker in workers:
+        worker['id'] = worker['_id']
     
     return {"workers": workers}
 
@@ -108,7 +95,7 @@ async def add_worker(
     worker_data: WorkerCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Add a new worker"""
+    """Add a new worker (worker must have logged in first to create Firebase Auth account)"""
     if current_user.get("role") != "employer":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -117,50 +104,87 @@ async def add_worker(
     
     employer_id = current_user["uid"]
     
+    # Check if employer exists in MongoDB
+    employer = await mongodb_service.get_employer(employer_id)
+    if not employer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employer profile not found. Please complete your profile first."
+        )
+    
+    # Preprocess: Convert empty strings to None
+    if worker_data.phone_number == "":
+        worker_data.phone_number = None
+    if worker_data.email == "":
+        worker_data.email = None
+    
+    # Normalize phone number (remove spaces)
+    if worker_data.phone_number:
+        worker_data.phone_number = worker_data.phone_number.replace(" ", "").strip()
+    
+    # Validate that at least one identifier (phone or email) is provided
+    if not worker_data.phone_number and not worker_data.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either phone number or email must be provided"
+        )
+    
+    # Look up worker by phone number OR email in MongoDB users collection
+    try:
+        # Build query based on what's provided
+        query = {}
+        if worker_data.phone_number:
+            query["phoneNumber"] = worker_data.phone_number
+            logger.info(f"🔍 Looking up worker by phone: {worker_data.phone_number}")
+        elif worker_data.email:
+            query["email"] = worker_data.email
+            logger.info(f"🔍 Looking up worker by email: {worker_data.email}")
+        
+        worker_user = await mongodb_service.db.users.find_one(query)
+        
+        if worker_user:
+            logger.info(f"✅ Found worker by {'phone' if worker_data.phone_number else 'email'}: {worker_user['_id']}")
+        else:
+            logger.warning(f"❌ Worker not found in database with query: {query}")
+    except Exception as e:
+        logger.error(f"Error looking up worker: {e}")
+        worker_user = None
+    
+    if not worker_user:
+        identifier = worker_data.phone_number or worker_data.email
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Worker with {identifier} must login to the app first to create their account. Ask them to download the app and complete login."
+        )
+    
+    worker_uid = worker_user['_id']
+    
+    # Check if worker already exists for this employer
+    existing_worker = await mongodb_service.get_worker(worker_uid)
+    if existing_worker:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Worker already exists in the system"
+        )
+    
     # Get employer config
-    employer_ref = firebase_service.db.collection('employers').document(employer_id)
-    employer_doc = employer_ref.get()
-    employer_data = employer_doc.to_dict() if employer_doc.exists else {}
-    withdrawal_config = employer_data.get('withdrawalConfig', {})
+    withdrawal_config = employer.get('withdrawalConfig', {})
     payday_date = withdrawal_config.get('paydayDate', 1)
     
-    # Create worker ID
-    worker_id = str(uuid.uuid4())
+    # Create worker in MongoDB with Firebase UID
+    worker_id = await mongodb_service.create_worker(
+        worker_uid,
+        {
+            "employer_id": employer_id,
+            "full_name": worker_data.full_name,
+            "phone_number": worker_data.phone_number or worker_user.get('phoneNumber', ''),
+            "email": worker_data.email or worker_user.get('email', ''),
+            "upi_id": worker_data.upi_id
+        }
+    )
     
-    # Create worker document
-    worker_doc_data = {
-        "employerId": employer_id,
-        "fullName": worker_data.full_name,
-        "phoneNumber": worker_data.phone_number,
-        "upiId": worker_data.upi_id,
-        "joinedAt": datetime.utcnow(),
-        "isActive": True,
-        "currentMonthEarnings": 0.0,
-        "totalWithdrawn": 0.0,
-        "nextPayday": wage_calculator.get_next_payday(payday_date)
-    }
-    
-    worker_ref = firebase_service.db.collection('workers').document(worker_id)
-    worker_ref.set(worker_doc_data)
-    
-    # Create initial wage ledger for current month
-    current_month = datetime.utcnow().strftime("%Y-%m")
-    ledger_id = str(uuid.uuid4())
-    ledger_data = {
-        "workerId": worker_id,
-        "employerId": employer_id,
-        "month": current_month,
-        "totalEarned": 0.0,
-        "totalWithdrawn": 0.0,
-        "availableBalance": 0.0,
-        "paydayDate": wage_calculator.get_next_payday(payday_date),
-        "status": "active",
-        "createdAt": datetime.utcnow(),
-        "updatedAt": datetime.utcnow()
-    }
-    
-    ledger_ref = firebase_service.db.collection('wage_ledgers').document(ledger_id)
-    ledger_ref.set(ledger_data)
+    # Create initial wage ledger
+    await mongodb_service.create_wage_ledger(worker_uid, employer_id)
     
     return {
         "success": True,
@@ -179,41 +203,27 @@ async def get_employer_dashboard(current_user: dict = Depends(get_current_user))
         )
     
     employer_id = current_user["uid"]
-    current_month = datetime.utcnow().strftime("%Y-%m")
     
     # Get all workers
-    workers_query = firebase_service.db.collection('workers') \
-        .where('employerId', '==', employer_id)
+    workers = await mongodb_service.get_employer_workers(employer_id)
+    total_workers = len(workers)
+    active_workers = sum(1 for w in workers if w.get('isActive', True))
     
-    total_workers = 0
-    active_workers = 0
-    
-    for doc in workers_query.get():
-        total_workers += 1
-        if doc.to_dict().get('isActive'):
-            active_workers += 1
-    
-    # Get current month's ledgers
-    ledgers_query = firebase_service.db.collection('wage_ledgers') \
-        .where('employerId', '==', employer_id) \
-        .where('month', '==', current_month) \
-        .where('status', '==', 'active')
-    
+    # Calculate totals from wage ledgers
     total_earnings = 0.0
     total_withdrawals = 0.0
     
-    for doc in ledgers_query.get():
-        ledger_data = doc.to_dict()
-        total_earnings += ledger_data.get('totalEarned', 0.0)
-        total_withdrawals += ledger_data.get('totalWithdrawn', 0.0)
+    for worker in workers:
+        ledger = await mongodb_service.get_wage_ledger(worker['_id'])
+        if ledger:
+            total_earnings += ledger.get('totalEarned', 0.0)
+            total_withdrawals += ledger.get('totalWithdrawn', 0.0)
     
     pending_settlement = total_earnings - total_withdrawals
     
     # Get employer config for next payday
-    employer_ref = firebase_service.db.collection('employers').document(employer_id)
-    employer_doc = employer_ref.get()
-    employer_data = employer_doc.to_dict() if employer_doc.exists else {}
-    withdrawal_config = employer_data.get('withdrawalConfig', {})
+    employer = await mongodb_service.get_employer(employer_id)
+    withdrawal_config = employer.get('withdrawalConfig', {}) if employer else {}
     payday_date = withdrawal_config.get('paydayDate', 1)
     next_payday = wage_calculator.get_next_payday(payday_date)
     
@@ -241,6 +251,11 @@ async def submit_attendance(
     
     employer_id = current_user["uid"]
     
+    # Get employer config
+    employer = await mongodb_service.get_employer(employer_id)
+    withdrawal_config = employer.get('withdrawalConfig', {}) if employer else {}
+    max_percentage = withdrawal_config.get('maxPercentage', 40)
+    
     # Process each attendance entry
     processed_entries = []
     
@@ -252,58 +267,20 @@ async def submit_attendance(
         )
         
         # Create attendance record
-        attendance_id = str(uuid.uuid4())
-        attendance_doc_data = {
-            "workerId": entry.worker_id,
-            "employerId": employer_id,
+        attendance_record = {
+            "worker_id": entry.worker_id,
+            "employer_id": employer_id,
             "date": datetime.strptime(entry.date, "%Y-%m-%d"),
-            "hoursWorked": entry.hours_worked,
-            "wagePerHour": entry.wage_per_hour,
-            "totalEarned": total_earned,
-            "status": entry.status,
-            "createdAt": datetime.utcnow()
+            "hours_worked": entry.hours_worked,
+            "wage_per_hour": entry.wage_per_hour,
+            "total_earned": total_earned,
+            "status": entry.status
         }
         
-        attendance_ref = firebase_service.db.collection('attendance').document(attendance_id)
-        attendance_ref.set(attendance_doc_data)
+        await mongodb_service.add_attendance(attendance_record)
         
-        # Update wage ledger
-        entry_month = datetime.strptime(entry.date, "%Y-%m-%d").strftime("%Y-%m")
-        
-        ledger_query = firebase_service.db.collection('wage_ledgers') \
-            .where('workerId', '==', entry.worker_id) \
-            .where('month', '==', entry_month) \
-            .where('status', '==', 'active') \
-            .limit(1)
-        
-        ledger_docs = ledger_query.get()
-        
-        if ledger_docs:
-            ledger_doc = ledger_docs[0]
-            ledger_data = ledger_doc.to_dict()
-            
-            new_total_earned = ledger_data.get('totalEarned', 0.0) + total_earned
-            total_withdrawn = ledger_data.get('totalWithdrawn', 0.0)
-            
-            # Get employer config
-            employer_ref = firebase_service.db.collection('employers').document(employer_id)
-            employer_doc = employer_ref.get()
-            employer_data = employer_doc.to_dict() if employer_doc.exists else {}
-            withdrawal_config = employer_data.get('withdrawalConfig', {})
-            max_percentage = withdrawal_config.get('maxPercentage', 40)
-            
-            # Calculate new available balance
-            balance_info = wage_calculator.calculate_available_balance(
-                total_earned=new_total_earned,
-                total_withdrawn=total_withdrawn,
-                max_percentage=max_percentage
-            )
-            
-            ledger_doc.reference.update({
-                "totalEarned": new_total_earned,
-                "availableBalance": balance_info['available_to_withdraw'],
-                "updatedAt": datetime.utcnow()
-            })
+        # Update wage ledger (atomic increment)
+        await mongodb_service.increment_earnings(entry.worker_id, total_earned)
         
         processed_entries.append({
             "worker_id": entry.worker_id,

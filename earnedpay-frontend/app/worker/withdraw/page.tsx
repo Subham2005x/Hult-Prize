@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguageStore } from '@/store/languageStore';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface Balance {
 export default function WithdrawPage() {
     const router = useRouter();
     const { user, token, role, loading } = useAuth();
+    const { t } = useLanguageStore();
     const [balance, setBalance] = useState<Balance | null>(null);
     const [amount, setAmount] = useState(0);
     const [upiId, setUpiId] = useState('');
@@ -95,13 +97,13 @@ export default function WithdrawPage() {
                         <div className="w-20 h-20 bg-success-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-in">
                             <CheckCircle2 className="w-12 h-12 text-white" />
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Withdrawal Successful!</h2>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('withdrawalSuccessful')}</h2>
                         <p className="text-gray-600 dark:text-gray-400 mb-4">
-                            {formatCurrency(amount)} has been sent to your UPI ID
+                            {formatCurrency(amount)} {t('hasBeenSent')}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{upiId}</p>
                         <Button onClick={() => router.push('/worker/dashboard')} size="lg" className="w-full">
-                            Back to Dashboard
+                            {t('backToDashboard')}
                         </Button>
                     </CardContent>
                 </Card>
@@ -121,8 +123,8 @@ export default function WithdrawPage() {
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-lg font-bold text-gray-900 dark:text-white">Withdraw Money</h1>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Instant UPI transfer</p>
+                            <h1 className="text-lg font-bold text-gray-900 dark:text-white">{t('withdrawMoney')}</h1>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('instantTransfer')}</p>
                         </div>
                     </div>
                     <ThemeToggle />
@@ -133,7 +135,7 @@ export default function WithdrawPage() {
                 {/* Available Balance */}
                 <Card className="bg-gradient-to-br from-primary-600 to-primary-700 border-0 text-white shadow-lg">
                     <CardContent className="py-6">
-                        <p className="text-sm text-primary-100 mb-1">Available to Withdraw</p>
+                        <p className="text-sm text-primary-100 mb-1">{t('availablewithdraw')}</p>
                         <p className="text-4xl font-bold tabular-nums">
                             {formatCurrency(balance.available_to_withdraw)}
                         </p>
@@ -144,9 +146,9 @@ export default function WithdrawPage() {
                 <form onSubmit={handleWithdraw} className="space-y-6">
                     <Card className="dark:bg-slate-800 dark:border-slate-700">
                         <CardHeader>
-                            <CardTitle>Select Amount</CardTitle>
+                            <CardTitle>{t('selectAmount')}</CardTitle>
                             <CardDescription>
-                                Choose how much you want to withdraw
+                                {t('chooseAmount')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
@@ -193,18 +195,18 @@ export default function WithdrawPage() {
 
                     <Card className="dark:bg-slate-800 dark:border-slate-700">
                         <CardHeader>
-                            <CardTitle>UPI Details</CardTitle>
+                            <CardTitle>{t('enterUpiDetails')}</CardTitle>
                             <CardDescription>
-                                Enter your UPI ID to receive money
+                                {t('enterUpi')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <Label htmlFor="upi">UPI ID</Label>
+                                <Label htmlFor="upi">{t('upiIdPlaceholder')}</Label>
                                 <Input
                                     id="upi"
                                     type="text"
-                                    placeholder="yourname@paytm"
+                                    placeholder={t('upiIdPlaceholder')}
                                     value={upiId}
                                     onChange={(e) => setUpiId(e.target.value)}
                                     required
@@ -231,10 +233,10 @@ export default function WithdrawPage() {
                         disabled={processing || !upiId || amount < 100}
                     >
                         {processing ? (
-                            'Processing...'
+                            t('processing')
                         ) : (
                             <>
-                                Withdraw {formatCurrency(amount)} <Wallet className="ml-2 w-5 h-5" />
+                                {t('withdraw')} {formatCurrency(amount)} <Wallet className="ml-2 w-5 h-5" />
                             </>
                         )}
                     </Button>
@@ -242,8 +244,7 @@ export default function WithdrawPage() {
                     <Card className="bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800/50">
                         <CardContent className="py-4">
                             <p className="text-sm text-primary-900 dark:text-primary-100">
-                                ⚡ <strong>Instant Transfer:</strong> Money will be credited to your UPI ID
-                                within seconds. No fees charged.
+                                ⚡ <strong>{t('instantTransfer')}:</strong> {t('instantTransferNote')}
                             </p>
                         </CardContent>
                     </Card>
@@ -259,7 +260,7 @@ export default function WithdrawPage() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <Home className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Home</span>
+                                <span className="text-[10px] font-medium">{t('home')}</span>
                             </button>
                         </Link>
 
@@ -268,7 +269,7 @@ export default function WithdrawPage() {
                         >
                             <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                             <CreditCard className="w-6 h-6 transition-transform duration-300 scale-110" />
-                            <span className="text-[10px] font-medium">Withdraw</span>
+                            <span className="text-[10px] font-medium">{t('withdraw')}</span>
                         </button>
 
                         <Link href="/worker/history">
@@ -276,7 +277,7 @@ export default function WithdrawPage() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <History className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">History</span>
+                                <span className="text-[10px] font-medium">{t('history')}</span>
                             </button>
                         </Link>
 
@@ -285,7 +286,7 @@ export default function WithdrawPage() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <User className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Profile</span>
+                                <span className="text-[10px] font-medium">{t('profile')}</span>
                             </button>
                         </Link>
                     </div>

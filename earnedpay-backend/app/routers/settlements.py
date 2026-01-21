@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies import get_current_user
 from app.models.settlement import Settlement, SettlementSummary, WorkerSettlement
-from app.services.firebase_service import firebase_service
+from app.services.mongodb_service import mongodb_service  # Changed from firebase_service
 from datetime import datetime
-import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,14 +23,15 @@ async def get_settlements(
     
     employer_id = current_user["uid"]
     
-    settlements_query = firebase_service.db.collection('settlements') \
-        .where('employerId', '==', employer_id) \
-        .order_by('settledAt', direction='DESCENDING') \
-        .limit(limit)
+    # Get settlements from MongoDB
+    cursor = mongodb_service.db.settlements.find(
+        {"employerId": employer_id}
+    ).sort("settledAt", -1).limit(limit)
+    
+    settlement_docs = await cursor.to_list(length=limit)
     
     settlements = []
-    for doc in settlements_query.get():
-        settlement_data = doc.to_dict()
+    for settlement_data in settlement_docs:
         settlements.append(SettlementSummary(
             month=settlement_data['month'],
             total_earnings=settlement_data['totalEarnings'],
@@ -58,18 +58,13 @@ async def process_settlement(
     
     employer_id = current_user["uid"]
     
-    # Get all active ledgers for the month
-    ledgers_query = firebase_service.db.collection('wage_ledgers') \
-        .where('employerId', '==', employer_id) \
-        .where('month', '==', month) \
-        .where('status', '==', 'active')
+    # Get all workers for this employer
+    workers = await mongodb_service.get_employer_workers(employer_id)
     
-    ledger_docs = ledgers_query.get()
-    
-    if not ledger_docs:
+    if not workers:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No active ledgers found for {month}"
+            detail=f"No workers found for employer"
         )
     
     # Calculate settlement
@@ -77,17 +72,17 @@ async def process_settlement(
     total_withdrawals = 0.0
     worker_settlements = []
     
-    for ledger_doc in ledger_docs:
-        ledger_data = ledger_doc.to_dict()
-        worker_id = ledger_data['workerId']
+    for worker in workers:
+        worker_id = worker['_id']
         
-        # Get worker details
-        worker_ref = firebase_service.db.collection('workers').document(worker_id)
-        worker_doc = worker_ref.get()
-        worker_data = worker_doc.to_dict() if worker_doc.exists else {}
+        # Get wage ledger for this worker
+        ledger = await mongodb_service.get_wage_ledger(worker_id)
         
-        earned = ledger_data.get('totalEarned', 0.0)
-        withdrawn = ledger_data.get('totalWithdrawn', 0.0)
+        if not ledger:
+            continue
+        
+        earned = ledger.get('totalEarned', 0.0)
+        withdrawn = ledger.get('totalWithdrawn', 0.0)
         net_paid = earned - withdrawn
         
         total_earnings += earned
@@ -95,24 +90,25 @@ async def process_settlement(
         
         worker_settlements.append({
             "workerId": worker_id,
-            "workerName": worker_data.get('fullName', 'Unknown'),
+            "workerName": worker.get('fullName', 'Unknown'),
             "earned": earned,
             "withdrawn": withdrawn,
             "netPaid": net_paid
         })
         
-        # Mark ledger as settled
-        ledger_doc.reference.update({
-            "status": "settled",
-            "updatedAt": datetime.utcnow()
-        })
+        # Reset ledger for new month (optional - depends on your business logic)
+        # You might want to keep historical data instead
+        # await mongodb_service.update_wage_ledger(worker_id, {
+        #     "totalEarned": 0.0,
+        #     "totalWithdrawn": 0.0,
+        #     "availableBalance": 0.0
+        # })
     
     net_settlement = total_earnings - total_withdrawals
     
-    # Create settlement record
-    settlement_id = str(uuid.uuid4())
+    # Create settlement record in MongoDB
     settlement_data = {
-        "employerId": employer_id,
+        "employer_id": employer_id,
         "month": month,
         "totalWorkers": len(worker_settlements),
         "totalEarnings": total_earnings,
@@ -123,8 +119,7 @@ async def process_settlement(
         "workerSettlements": worker_settlements
     }
     
-    settlement_ref = firebase_service.db.collection('settlements').document(settlement_id)
-    settlement_ref.set(settlement_data)
+    settlement_id = await mongodb_service.create_settlement(settlement_data)
     
     return {
         "success": True,

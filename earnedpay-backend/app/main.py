@@ -103,6 +103,15 @@ async def startup_event():
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"Allowed origins: {settings.allowed_origins_list}")
+    
+    # Test MongoDB connection
+    try:
+        from app.services.mongodb_service import mongodb_service
+        await mongodb_service.db.command('ping')
+        logger.info("✅ MongoDB Atlas connected successfully")
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
+        logger.error("Check MONGODB_URL in .env file")
 
 
 # Shutdown event

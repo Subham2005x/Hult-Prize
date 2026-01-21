@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguageStore } from '@/store/languageStore';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ interface Transaction {
 export default function TransactionHistory() {
     const router = useRouter();
     const { user, token, role, loading } = useAuth();
+    const { t } = useLanguageStore();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loadingTransactions, setLoadingTransactions] = useState(true);
 
@@ -94,8 +96,8 @@ export default function TransactionHistory() {
                         </Button>
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold">Transaction History</h1>
-                        <p className="text-xs text-muted-foreground">All your withdrawals</p>
+                        <h1 className="text-lg font-bold">{t('transactionHistory')}</h1>
+                        <p className="text-xs text-muted-foreground">{t('allWithdrawals')}</p>
                     </div>
                 </div>
             </header>
@@ -103,8 +105,8 @@ export default function TransactionHistory() {
             <main className="max-w-4xl mx-auto px-4 py-6">
                 {transactions.length > 0 ? (
                     <div className="space-y-3">
-                        {transactions.map((txn) => (
-                            <Card key={txn.id} className="hover:shadow-md transition-shadow">
+                        {transactions.map((txn, index) => (
+                            <Card key={txn.id || index} className="hover:shadow-md transition-shadow">
                                 <CardContent className="p-4">
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-start gap-3">
@@ -114,7 +116,7 @@ export default function TransactionHistory() {
                                                 {getStatusIcon(txn.status)}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-gray-900 dark:text-white mb-1">Withdrawal</p>
+                                                <p className="font-semibold text-gray-900 dark:text-white mb-1">{t('withdrawal')}</p>
                                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                                                     {formatDateTime(txn.requested_at)}
                                                 </p>
@@ -137,12 +139,12 @@ export default function TransactionHistory() {
                                     {txn.status === 'completed' && txn.transaction_id && (
                                         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
                                             <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">Transaction ID</span>
+                                                <span className="text-gray-500 dark:text-gray-400">{t('transactionId')}</span>
                                                 <span className="font-mono text-gray-900 dark:text-white">{txn.transaction_id}</span>
                                             </div>
                                             {txn.completed_at && (
                                                 <div className="flex items-center justify-between text-sm mt-2">
-                                                    <span className="text-gray-500 dark:text-gray-400">Completed at</span>
+                                                    <span className="text-gray-500 dark:text-gray-400">{t('completedAt')}</span>
                                                     <span className="text-gray-900 dark:text-white">{formatDateTime(txn.completed_at)}</span>
                                                 </div>
                                             )}
@@ -152,7 +154,7 @@ export default function TransactionHistory() {
                                     {txn.status === 'failed' && txn.failure_reason && (
                                         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
                                             <p className="text-sm text-red-600 dark:text-red-400">
-                                                <span className="font-medium">Reason:</span> {txn.failure_reason}
+                                                <span className="font-medium">{t('reason')}:</span> {txn.failure_reason}
                                             </p>
                                         </div>
                                     )}
@@ -167,14 +169,14 @@ export default function TransactionHistory() {
                                 <Download className="w-10 h-10 text-gray-400 dark:text-gray-300" />
                             </div>
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                                No transactions yet
+                                {t('noTransactions')}
                             </h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-6">
-                                Your withdrawal history will appear here
+                                {t('history_empty')}
                             </p>
                             <Link href="/worker/withdraw">
                                 <Button>
-                                    Make Your First Withdrawal
+                                    {t('makeFirstWithdrawal')}
                                 </Button>
                             </Link>
                         </CardContent>
@@ -191,7 +193,7 @@ export default function TransactionHistory() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <Home className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Home</span>
+                                <span className="text-[10px] font-medium">{t('home')}</span>
                             </button>
                         </Link>
 
@@ -200,7 +202,7 @@ export default function TransactionHistory() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <CreditCard className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Withdraw</span>
+                                <span className="text-[10px] font-medium">{t('withdraw')}</span>
                             </button>
                         </Link>
 
@@ -209,7 +211,7 @@ export default function TransactionHistory() {
                         >
                             <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                             <HistoryIcon className="w-6 h-6 transition-transform duration-300 scale-110" />
-                            <span className="text-[10px] font-medium">History</span>
+                            <span className="text-[10px] font-medium">{t('history')}</span>
                         </button>
 
                         <Link href="/worker/profile">
@@ -217,7 +219,7 @@ export default function TransactionHistory() {
                                 className="relative flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                             >
                                 <User className="w-6 h-6 transition-transform duration-300" />
-                                <span className="text-[10px] font-medium">Profile</span>
+                                <span className="text-[10px] font-medium">{t('profile')}</span>
                             </button>
                         </Link>
                     </div>

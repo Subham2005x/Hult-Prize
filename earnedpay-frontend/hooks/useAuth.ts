@@ -16,14 +16,22 @@ export function useAuth() {
                     setToken(idToken);
                     setUser(firebaseUser);
 
-                    // Verify token with backend and get user role
-                    const userData = await api.getCurrentUser(idToken);
-                    setRole(userData.role);
-                    setProfile(userData);
+                    // First, verify token with backend to ensure user exists in MongoDB
+                    // This will create the user if they don't exist
+                    try {
+                        // Try to get current user first
+                        const userData = await api.getCurrentUser(idToken);
+                        setRole(userData.role);
+                        setProfile(userData);
+                    } catch (error: any) {
+                        // If user doesn't exist (404), they need to use the login page
+                        // which will call verify-token with the role
+                        console.log('User not found in database, needs to complete login flow');
+                        // Don't logout, let them complete the login process
+                    }
                 } catch (error: any) {
                     console.error('Error verifying user:', error);
-                    // Only logout if it's an auth error, not if user doesn't exist yet (404)
-                    // The LoginPage will handle creation via verifyToken
+                    // Only logout on actual auth errors
                     if (error.message && !error.message.includes('User not registered') && !error.message.includes('404')) {
                         logout();
                     }

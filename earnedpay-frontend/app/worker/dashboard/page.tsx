@@ -11,6 +11,8 @@ import { Wallet, ArrowRight, Calendar, TrendingUp, LogOut, History, User, Home, 
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLanguageStore } from '@/store/languageStore';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 interface Balance {
     total_earned: number;
@@ -31,10 +33,12 @@ interface Transaction {
 export default function WorkerDashboard() {
     const router = useRouter();
     const { user, token, role, profile, loading, logout } = useAuth();
+    const { t } = useLanguageStore();
     const [balance, setBalance] = useState<Balance | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loadingBalance, setLoadingBalance] = useState(true);
     const [activeTab, setActiveTab] = useState('home');
+    const [workerData, setWorkerData] = useState<any>(null);
 
     useEffect(() => {
         if (!loading && (!user || role !== 'worker')) {
@@ -46,8 +50,18 @@ export default function WorkerDashboard() {
         if (token) {
             fetchBalance();
             fetchTransactions();
+            fetchProfile();
         }
     }, [token]);
+
+    const fetchProfile = async () => {
+        try {
+            const data = await api.worker.getProfile(token!);
+            setWorkerData(data);
+        } catch (error) {
+            console.error('Failed to fetch profile:', error);
+        }
+    };
 
     const fetchBalance = async () => {
         try {
@@ -107,8 +121,8 @@ export default function WorkerDashboard() {
 
                     {/* Stats Grid Skeleton */}
                     <div className="grid grid-cols-2 gap-4">
-                        <Skeleton className="h-32 rounded-xl" />
-                        <Skeleton className="h-32 rounded-xl" />
+                        <Skeleton key="skeleton-stat-1" className="h-32 rounded-xl" />
+                        <Skeleton key="skeleton-stat-2" className="h-32 rounded-xl" />
                     </div>
 
                     {/* Recent Transactions Skeleton */}
@@ -117,8 +131,8 @@ export default function WorkerDashboard() {
                             <Skeleton className="h-6 w-32" />
                             <Skeleton className="h-8 w-20 rounded-md" />
                         </div>
-                        <Skeleton className="h-20 rounded-xl" />
-                        <Skeleton className="h-20 rounded-xl" />
+                        <Skeleton key="skeleton-txn-1" className="h-20 rounded-xl" />
+                        <Skeleton key="skeleton-txn-2" className="h-20 rounded-xl" />
                     </div>
                 </main>
             </div>
@@ -139,11 +153,17 @@ export default function WorkerDashboard() {
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">EarnedPay</h1>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Your earnings, anytime</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{t('yourEarnings')}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <div className="hidden md:block">
+                                <LanguageSwitcher />
+                            </div>
                             <ThemeToggle />
+                            <div className="md:hidden">
+                                <LanguageSwitcher />
+                            </div>
                             <button className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors">
                                 <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                             </button>
@@ -162,10 +182,10 @@ export default function WorkerDashboard() {
                 {/* Welcome Section */}
                 <div className="animate-fade-in">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                        Welcome back! 👋
+                        {t('welcome')} 👋
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400">
-                        {user?.phoneNumber || 'Worker'}
+                        {workerData?.fullName || user?.phoneNumber || 'Worker'}
                     </p>
                 </div>
 
@@ -198,7 +218,7 @@ export default function WorkerDashboard() {
                     <CardHeader className="relative z-10">
                         <div className="flex items-center justify-between mb-2">
                             <CardDescription className="text-primary-100 font-medium">
-                                Available Balance
+                                {t('available')}
                             </CardDescription>
                             <div className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold">
                                 {balance && balance.available_to_withdraw > 0 ? 'Ready to withdraw' : 'No balance'}
@@ -209,45 +229,93 @@ export default function WorkerDashboard() {
                         </CardTitle>
                         <div className="flex items-center gap-4 text-sm">
                             <div>
-                                <p className="text-primary-100 mb-1">Total Earned</p>
+                                <p className="text-primary-100 mb-1">{t('totalEarned')}</p>
                                 <p className="font-semibold text-lg tabular-nums">
                                     {balance ? formatCurrency(balance.total_earned) : '₹0'}
                                 </p>
                             </div>
                             <div className="h-8 w-px bg-white/20"></div>
                             <div>
-                                <p className="text-primary-100 mb-1">Withdrawn</p>
+                                <p className="text-primary-100 mb-1">{t('withdrawn')}</p>
                                 <p className="font-semibold text-lg tabular-nums">
                                     {balance ? formatCurrency(balance.total_withdrawn) : '₹0'}
                                 </p>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="relative z-10 space-y-3">
-                        {/* Progress Bar */}
+                    <CardContent className="space-y-8">
+                        {/* Enhanced Progress Bar */}
                         {balance && balance.total_earned > 0 && (
                             <div>
-                                <div className="flex justify-between text-xs text-primary-100 mb-2">
-                                    <span>Withdrawal limit used</span>
-                                    <span>{Math.round(withdrawalPercentage)}%</span>
+                                <div className="flex justify-between items-end mb-4">
+                                    <div className="space-y-1">
+                                        <span className="text-xs font-bold text-primary-100 uppercase tracking-widest opacity-80">{t('withdrawalLimit')}</span>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-4xl font-extrabold text-white tracking-tight">{Math.round(withdrawalPercentage)}%</span>
+                                            <span className="text-sm text-primary-100 font-medium opacity-80">{t('used')}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right pb-2">
+                                        <div className="text-xs text-primary-100 mb-1 opacity-80">{t('available')}</div>
+                                        <div className="text-xl font-bold text-white tabular-nums drop-shadow-md">
+                                            ₹{balance.available_to_withdraw.toLocaleString()}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+
+                                <div className="relative h-5 bg-black/20 rounded-full overflow-hidden backdrop-blur-md shadow-inner ring-1 ring-white/10">
+                                    {/* Background glow effect */}
                                     <div
-                                        className="h-full bg-white rounded-full transition-all duration-500"
-                                        style={{ width: `${Math.min(withdrawalPercentage, 100)}%` }}
-                                    ></div>
+                                        className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/10 animate-pulse"
+                                        style={{ animationDuration: '3s' }}
+                                    />
+                                    {/* Progress fill with gradient and glow */}
+                                    <div
+                                        className="relative h-full bg-gradient-to-r from-primary-200 via-white to-primary-200 rounded-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                                        style={{
+                                            width: `${Math.min(withdrawalPercentage, 100)}%`,
+                                        }}
+                                    >
+                                        {/* Shimmer effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"
+                                            style={{
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 2s infinite'
+                                            }}
+                                        />
+                                    </div>
+                                    {/* Percentage indicator dot */}
+                                    {withdrawalPercentage > 2 && (
+                                        <div
+                                            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg ring-4 ring-primary-500/30 transition-all duration-1000"
+                                            style={{
+                                                left: `calc(${Math.min(withdrawalPercentage, 100)}% - 8px)`
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                                <div className="flex justify-between mt-2 text-[10px] text-primary-100 font-medium px-1 opacity-70">
+                                    <span>₹0</span>
+                                    <span>{t('limit')}: ₹{balance.max_withdrawable.toLocaleString()}</span>
                                 </div>
                             </div>
                         )}
 
-                        <Link href="/worker/withdraw">
+                        <Link href="/worker/withdraw" className="block w-full group">
                             <Button
-                                className="w-full bg-white text-primary-700 hover:bg-gray-100 shadow-lg font-semibold h-14 text-base"
+                                className="w-full h-16 text-lg font-bold bg-white text-primary-700 hover:bg-white/95 shadow-xl shadow-black/10 border-0 rounded-2xl transition-all duration-300 relative overflow-hidden"
                                 disabled={!balance || balance.available_to_withdraw <= 0}
                             >
-                                <Wallet className="mr-2 w-5 h-5" />
-                                Withdraw Money
-                                <ArrowRight className="ml-2 w-5 h-5" />
+                                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-primary-50/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                <div className="flex items-center justify-between w-full px-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 group-hover:scale-110 transition-transform shadow-sm">
+                                            <Wallet className="w-5 h-5" />
+                                        </div>
+                                        <span>{t('withdrawMoney')}</span>
+                                    </div>
+                                    <ArrowRight className="w-5 h-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </div>
                             </Button>
                         </Link>
                     </CardContent>
@@ -266,12 +334,12 @@ export default function WorkerDashboard() {
                                     {daysUntilPayday} days
                                 </span>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Next Payday</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t('nextPayday')}</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white">
                                 {balance ? formatDate(balance.next_payday) : '-'}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 tabular-nums">
-                                Expected: {balance ? formatCurrency(balance.payday_amount) : '₹0'}
+                                {t('expected')}: {balance ? formatCurrency(balance.payday_amount) : '₹0'}
                             </p>
                         </CardContent>
                     </Card>
@@ -287,7 +355,7 @@ export default function WorkerDashboard() {
                                     +100%
                                 </span>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">This Month</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t('thisMonth')}</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white tabular-nums">
                                 {balance ? formatCurrency(balance.total_earned) : '₹0'}
                             </p>
@@ -304,11 +372,11 @@ export default function WorkerDashboard() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <History className="w-5 h-5 text-gray-400" />
-                                <CardTitle className="text-lg dark:text-white">Recent Activity</CardTitle>
+                                <CardTitle className="text-lg dark:text-white">{t('recentActivity')}</CardTitle>
                             </div>
                             <Link href="/worker/history">
                                 <Button variant="ghost" size="sm" className="text-primary-600 dark:text-primary-400">
-                                    View All
+                                    {t('viewAll')}
                                     <ChevronRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </Link>
@@ -403,7 +471,7 @@ export default function WorkerDashboard() {
                                 <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                             )}
                             <Home className={`w-6 h-6 transition-transform duration-300 ${activeTab === 'home' ? 'scale-110' : ''}`} />
-                            <span className="text-[10px] font-medium">Home</span>
+                            <span className="text-[10px] font-medium">{t('home')}</span>
                         </button>
 
                         <Link href="/worker/withdraw">
@@ -418,7 +486,7 @@ export default function WorkerDashboard() {
                                     <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                                 )}
                                 <CreditCard className={`w-6 h-6 transition-transform duration-300 ${activeTab === 'withdraw' ? 'scale-110' : ''}`} />
-                                <span className="text-[10px] font-medium">Withdraw</span>
+                                <span className="text-[10px] font-medium">{t('withdraw')}</span>
                             </button>
                         </Link>
 
@@ -434,7 +502,7 @@ export default function WorkerDashboard() {
                                     <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                                 )}
                                 <History className={`w-6 h-6 transition-transform duration-300 ${activeTab === 'history' ? 'scale-110' : ''}`} />
-                                <span className="text-[10px] font-medium">History</span>
+                                <span className="text-[10px] font-medium">{t('history')}</span>
                             </button>
                         </Link>
 
@@ -449,7 +517,7 @@ export default function WorkerDashboard() {
                                 <div className="absolute inset-0 bg-primary-50 dark:bg-primary-900/20 rounded-2xl -z-10 animate-fade-in" />
                             )}
                             <User className={`w-6 h-6 transition-transform duration-300 ${activeTab === 'profile' ? 'scale-110' : ''}`} />
-                            <span className="text-[10px] font-medium">Profile</span>
+                            <span className="text-[10px] font-medium">{t('profile')}</span>
                         </button>
                     </div>
                 </div>
