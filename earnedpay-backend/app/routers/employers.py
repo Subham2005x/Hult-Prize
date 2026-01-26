@@ -64,6 +64,13 @@ async def update_employer_profile(
         mongodb_update['gstNumber'] = update_dict['gst_number']
     if 'withdrawal_config' in update_dict:
         mongodb_update['withdrawalConfig'] = update_dict['withdrawal_config']
+    
+    # Handle KYC data from onboarding
+    if 'kyc_data' in update_dict:
+        kyc_data = update_dict['kyc_data']
+        mongodb_update['kycData'] = kyc_data
+        mongodb_update['kycVerified'] = False  # Will be verified later
+        mongodb_update['kycSubmittedAt'] = datetime.now()
         
     if mongodb_update:
         await mongodb_service.update_employer(current_user["uid"], mongodb_update)
@@ -191,6 +198,51 @@ async def add_worker(
         "worker_id": worker_id,
         "message": f"Worker {worker_data.full_name} added successfully"
     }
+
+
+@router.delete("/me/workers/{worker_id}")
+async def delete_worker(
+    worker_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Remove a worker from employer's workforce"""
+    if current_user.get("role") != "employer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Employer role required."
+        )
+    
+    employer_id = current_user["uid"]
+    
+    try:
+        # Remove worker from employer's workers list
+        result = await mongodb_service.db.users.update_one(
+            {"_id": employer_id},
+            {"$pull": {"workers": worker_id}}
+        )
+        
+        # Also remove employer from worker's employers list
+        await mongodb_service.db.users.update_one(
+            {"_id": worker_id},
+            {"$pull": {"employers": employer_id}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Worker not found or already removed"
+            )
+        
+        return {
+            "success": True,
+            "message": "Worker removed successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error deleting worker: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete worker"
+        )
 
 
 @router.get("/me/dashboard", response_model=EmployerDashboard)

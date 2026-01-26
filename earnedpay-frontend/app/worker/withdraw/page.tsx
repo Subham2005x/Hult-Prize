@@ -20,6 +20,7 @@ interface Balance {
     total_withdrawn: number;
     available_to_withdraw: number;
     max_withdrawable: number;
+    max_withdrawal_percentage: number;
     next_payday: string;
     payday_amount: number;
 }
@@ -31,6 +32,7 @@ export default function WithdrawPage() {
     const [balance, setBalance] = useState<Balance | null>(null);
     const [amount, setAmount] = useState(0);
     const [upiId, setUpiId] = useState('');
+    const [profileUpiId, setProfileUpiId] = useState(''); // Store profile UPI for reference
     const [processing, setProcessing] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
@@ -44,6 +46,7 @@ export default function WithdrawPage() {
     useEffect(() => {
         if (token) {
             fetchBalance();
+            fetchProfile();
         }
     }, [token]);
 
@@ -54,6 +57,19 @@ export default function WithdrawPage() {
             setAmount(Math.min(1000, data.available_to_withdraw));
         } catch (error) {
             console.error('Failed to fetch balance:', error);
+        }
+    };
+
+    const fetchProfile = async () => {
+        try {
+            const data = await api.worker.getProfile(token!);
+            // Pre-fill UPI ID from profile if it exists
+            if (data.upiId) {
+                setUpiId(data.upiId);
+                setProfileUpiId(data.upiId);
+            }
+        } catch (error) {
+            console.error('Failed to fetch profile:', error);
         }
     };
 
@@ -213,9 +229,15 @@ export default function WithdrawPage() {
                                     pattern="[\w.-]+@[\w.-]+"
                                     className="dark:bg-slate-950 dark:border-slate-600"
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    Example: 9876543210@paytm, yourname@phonepe
-                                </p>
+                                {profileUpiId && upiId === profileUpiId ? (
+                                    <p className="text-xs text-primary-600 dark:text-primary-400 flex items-center gap-1">
+                                        ✓ Using your saved UPI ID from profile
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        Example: 9876543210@paytm, yourname@phonepe
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -242,10 +264,20 @@ export default function WithdrawPage() {
                     </Button>
 
                     <Card className="bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800/50">
-                        <CardContent className="py-4">
+                        <CardContent className="py-4 space-y-3">
                             <p className="text-sm text-primary-900 dark:text-primary-100">
                                 ⚡ <strong>{t('instantTransfer')}:</strong> {t('instantTransferNote')}
                             </p>
+                            <div className="pt-2 border-t border-primary-200 dark:border-primary-700">
+                                <p className="text-sm text-primary-900 dark:text-primary-100">
+                                    📊 <strong>Your Withdrawal Limit:</strong> Your employer allows you to withdraw up to {balance.max_withdrawal_percentage}% of earned wages.
+                                </p>
+                                {balance.max_withdrawal_percentage < 100 && (
+                                    <p className="text-xs text-primary-700 dark:text-primary-200 mt-2 italic">
+                                        💬 Need a higher limit? Contact your employer to request an increase in your withdrawal percentage.
+                                    </p>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </form>

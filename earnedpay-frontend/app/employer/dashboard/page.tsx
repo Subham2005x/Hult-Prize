@@ -205,13 +205,7 @@ export default function EmployerDashboard() {
                         </Link>
                     </div>
 
-                    <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/50">
-                        <CardContent className="py-4">
-                            <p className="text-sm text-blue-900 dark:text-blue-100">
-                                💡 <strong>Insight:</strong> 85% of your workers verified their UPI IDs this week.
-                            </p>
-                        </CardContent>
-                    </Card>
+
                 </div>
             </div>
         </div>

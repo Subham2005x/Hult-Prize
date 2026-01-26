@@ -48,6 +48,12 @@ export function Sidebar({ className }: SidebarProps) {
             href: '/employer/settlements',
             color: 'text-emerald-500',
         },
+        {
+            label: 'Billing',
+            icon: PieChart,
+            href: '/employer/billing',
+            color: 'text-orange-500',
+        },
     ];
 
     return (
@@ -110,20 +116,26 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
             </div>
 
-            {/* Bottom Card - Premium Feature or Status */}
+            {/* Bottom Card - Enterprise Upgrade */}
             <div className="px-4 mt-8">
-                <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4 text-white shadow-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Building2 className="w-4 h-4 text-blue-400" />
-                        <span className="text-sm font-semibold">Enterprise Plan</span>
+                <Link href="/employer/enterprise">
+                    <div className="bg-gradient-to-br from-purple-600 to-primary-600 rounded-xl p-4 text-white shadow-xl hover:shadow-2xl transition-all cursor-pointer group">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Building2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <span className="text-sm font-bold">Upgrade to Enterprise</span>
+                        </div>
+                        <p className="text-xs text-purple-100 mb-3">
+                            Unlock advanced analytics, multi-location management & more
+                        </p>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full bg-white text-purple-700 hover:bg-gray-100 font-semibold text-xs group-hover:scale-105 transition-transform"
+                        >
+                            Learn More →
+                        </Button>
                     </div>
-                    <p className="text-xs text-slate-300 mb-3">
-                        Your payroll runs are automated for this month.
-                    </p>
-                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-blue-500 h-full w-[70%]" />
-                    </div>
-                </div>
+                </Link>
             </div>
         </div>
     );

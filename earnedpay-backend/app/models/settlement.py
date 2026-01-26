@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
 
@@ -29,8 +29,15 @@ class Settlement(BaseModel):
 
 class SettlementSummary(BaseModel):
     month: str
-    total_earnings: float
-    total_withdrawals: float
-    net_settlement: float
-    settled_at: datetime
+    total_workers: int = Field(default=0, alias='totalWorkers')
+    total_earnings: float = Field(alias='totalEarnings')
+    total_withdrawals: float = Field(alias='totalWithdrawals')
+    net_settlement: float = Field(alias='netSettlement')
+    settled_at: datetime = Field(alias='settledAt')
     status: str
+    
+    class Config:
+        populate_by_name = True  # Allow both snake_case and camelCase
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

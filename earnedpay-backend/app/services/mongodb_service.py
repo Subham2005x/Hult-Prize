@@ -354,13 +354,18 @@ class MongoDBService:
         try:
             settlement_doc = {
                 "employerId": settlement_data.get("employer_id"),
-                "amount": settlement_data.get("amount"),
-                "status": settlement_data.get("status", "pending"),
-                "razorpayOrderId": settlement_data.get("razorpay_order_id"),
-                "createdAt": datetime.utcnow(),
-                "completedAt": settlement_data.get("completed_at")
+                "month": settlement_data.get("month"),
+                "totalWorkers": settlement_data.get("totalWorkers", 0),
+                "totalEarnings": settlement_data.get("totalEarnings", 0.0),
+                "totalWithdrawals": settlement_data.get("totalWithdrawals", 0.0),
+                "netSettlement": settlement_data.get("netSettlement", 0.0),
+                "status": settlement_data.get("status", "completed"),
+                "workerSettlements": settlement_data.get("workerSettlements", []),
+                "settledAt": settlement_data.get("settledAt", datetime.utcnow()),
+                "createdAt": datetime.utcnow()
             }
             result = await self.db.settlements.insert_one(settlement_doc)
+            logger.info(f"Created settlement for employer {settlement_data.get('employer_id')} for month {settlement_data.get('month')}")
             return str(result.inserted_id)
         except Exception as e:
             logger.error(f"Error creating settlement: {e}")

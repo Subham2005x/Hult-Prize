@@ -7,9 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { Input } from "@/components/ui/input";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 export function Header() {
-    const { user } = useAuth();
+    const { user, token } = useAuth();
+    const [companyName, setCompanyName] = useState<string>('');
+
+    useEffect(() => {
+        if (token) {
+            fetchProfile();
+        }
+    }, [token]);
+
+    const fetchProfile = async () => {
+        try {
+            const profile = await api.employer.getProfile(token!);
+            setCompanyName(profile.companyName || profile.email || 'Employer');
+        } catch (error) {
+            console.error('Failed to fetch profile:', error);
+        }
+    };
+
+    const displayName = companyName || user?.email || 'Employer';
+    const initial = displayName.charAt(0).toUpperCase();
 
     return (
         <div className="border-b bg-background/95 backdrop-blur z-50 sticky top-0">
@@ -45,11 +66,11 @@ export function Header() {
                     <ThemeToggle />
                     <div className="hidden md:flex items-center gap-3 pl-2 border-l">
                         <div className="text-right">
-                            <p className="text-sm font-medium leading-none">{user?.email || 'Employer'}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Admin</p>
+                            <p className="text-sm font-medium leading-none">{displayName}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Employer</p>
                         </div>
                         <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
-                            {user?.email?.charAt(0).toUpperCase() || 'E'}
+                            {initial}
                         </div>
                     </div>
                 </div>

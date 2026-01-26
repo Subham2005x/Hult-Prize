@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/employer/sidebar";
 import { Header } from "@/components/employer/header";
+import { OnboardingReminder } from "@/components/employer/onboarding-reminder";
 
 export default function EmployerLayout({
     children,
@@ -15,6 +16,7 @@ export default function EmployerLayout({
             </div>
             <div className="md:pl-72 flex flex-col min-h-screen">
                 <Header />
+                <OnboardingReminder />
                 <main className="flex-1 p-4 md:p-8 bg-muted/20 dark:bg-muted/10">
                     {children}
                 </main>

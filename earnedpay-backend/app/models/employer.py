@@ -50,4 +50,5 @@ class EmployerUpdate(BaseModel):
     phone_number: Optional[str] = None
     gst_number: Optional[str] = None
     withdrawal_config: Optional[dict] = None
+    kyc_data: Optional[dict] = None  # KYC data from onboarding
 

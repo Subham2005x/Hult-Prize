@@ -36,6 +36,7 @@ class WorkerBalance(BaseModel):
     total_withdrawn: float
     available_to_withdraw: float
     max_withdrawable: float
+    max_withdrawal_percentage: int  # Employer's configured limit (e.g., 40 for 40%)
     next_payday: datetime
     payday_amount: float
 

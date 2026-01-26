@@ -151,17 +151,13 @@ export default function AttendancePage() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Hourly Wage (₹)</Label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        className="pl-10"
-                                        value={wagePerHour}
-                                        onChange={(e) => setWagePerHour(e.target.value)}
-                                    />
-                                </div>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={wagePerHour}
+                                    onChange={(e) => setWagePerHour(e.target.value)}
+                                />
                             </div>
                         </div>
 

@@ -60,8 +60,8 @@ export default function HomePage() {
                     </div>
 
                     <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-8 leading-tight">
-                        Democratizing Access to <br className="hidden md:block" />
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-500">Earned Capital</span>
+                        Unlocking wages. <br className="hidden md:block" />
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-500">Empowering workers</span>
                     </h1>
 
                     <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-12 leading-relaxed font-light">
@@ -232,7 +232,7 @@ export default function HomePage() {
 
             <footer className="py-8 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800">
                 <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-sm text-slate-500">
-                    <div>© 2024 EarnedPay Inc. All rights reserved.</div>
+                    <div>© 2026 EarnedPay Inc. All rights reserved.</div>
                     <div className="flex gap-6 mt-4 md:mt-0">
                         <a href="#" className="hover:text-slate-900 dark:hover:text-slate-300">Privacy Policy</a>
                         <a href="#" className="hover:text-slate-900 dark:hover:text-slate-300">Terms of Service</a>

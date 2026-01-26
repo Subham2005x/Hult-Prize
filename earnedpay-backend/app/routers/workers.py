@@ -65,6 +65,7 @@ async def get_worker_balance(current_user: dict = Depends(get_current_user)):
             total_withdrawn=0.0,
             available_to_withdraw=0.0,
             max_withdrawable=0.0,
+            max_withdrawal_percentage=40,  # Default value
             next_payday=datetime.utcnow(),
             payday_amount=0.0
         )
@@ -93,6 +94,7 @@ async def get_worker_balance(current_user: dict = Depends(get_current_user)):
         total_withdrawn=balance_info['total_withdrawn'],
         available_to_withdraw=balance_info['available_to_withdraw'],
         max_withdrawable=balance_info['max_withdrawable'],
+        max_withdrawal_percentage=max_percentage,  # Include employer's limit
         next_payday=next_payday,
         payday_amount=payday_amount
     )

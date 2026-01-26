@@ -11,9 +11,9 @@ import { ArrowLeft, Download, CheckCircle, Clock, AlertTriangle } from 'lucide-r
 import { formatCurrency, formatDate } from '@/lib/utils'; // Assuming formatCurrency exists
 
 interface Settlement {
-    id: string;
+    id?: string;
     month: string;
-    totalWorkers: number;
+    totalWorkers?: number;
     totalEarnings: number;
     totalWithdrawals: number;
     netSettlement: number;
@@ -45,28 +45,8 @@ export default function SettlementsPage() {
             setSettlements(data.settlements || []);
         } catch (error) {
             console.error('Failed to fetch settlements:', error);
-            // Mock data for demo if API fails or empty
-            setSettlements([
-                {
-                    id: '1',
-                    month: '2023-11',
-                    totalWorkers: 12,
-                    totalEarnings: 150000,
-                    totalWithdrawals: 45000,
-                    netSettlement: 105000,
-                    status: 'completed',
-                    settledAt: '2023-12-01T10:00:00Z'
-                },
-                {
-                    id: '2',
-                    month: '2023-12',
-                    totalWorkers: 14,
-                    totalEarnings: 180000,
-                    totalWithdrawals: 60000,
-                    netSettlement: 120000,
-                    status: 'pending'
-                }
-            ]);
+            // Show empty state instead of mock data
+            setSettlements([]);
         } finally {
             setIsLoadingData(false);
         }
@@ -82,6 +62,187 @@ export default function SettlementsPage() {
             console.error(error);
             alert('Failed to process settlement');
         }
+    };
+
+    const handleDownloadReport = (settlement: Settlement) => {
+        // Dynamically import jsPDF
+        import('jspdf').then(({ default: jsPDF }) => {
+            const doc = new jsPDF();
+
+            // Set up colors
+            const primaryColor = [59, 130, 246]; // Blue
+            const textColor = [31, 41, 55]; // Gray-800
+            const lightGray = [156, 163, 175]; // Gray-400
+
+            let yPos = 20;
+
+            // Header
+            doc.setFillColor(...primaryColor);
+            doc.rect(0, 0, 210, 40, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SETTLEMENT REPORT', 105, 20, { align: 'center' });
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Period: ${settlement.month}`, 105, 30, { align: 'center' });
+
+            yPos = 50;
+            doc.setTextColor(...textColor);
+
+            // Status Badge
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            const statusText = `Status: ${settlement.status.toUpperCase()}`;
+            const statusColor = settlement.status === 'completed' ? [34, 197, 94] : [234, 179, 8];
+            doc.setFillColor(...statusColor);
+            doc.setTextColor(255, 255, 255);
+            doc.roundedRect(15, yPos, 50, 8, 2, 2, 'F');
+            doc.text(statusText, 40, yPos + 5.5, { align: 'center' });
+
+            // Date Generated
+            doc.setTextColor(...lightGray);
+            doc.setFont('helvetica', 'normal');
+            const dateGenerated = new Date().toLocaleDateString('en-IN', {
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            doc.text(`Generated: ${dateGenerated}`, 195, yPos + 5.5, { align: 'right' });
+
+            yPos += 20;
+            doc.setTextColor(...textColor);
+
+            // Summary Section
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SUMMARY', 15, yPos);
+            yPos += 2;
+            doc.setDrawColor(...primaryColor);
+            doc.setLineWidth(0.5);
+            doc.line(15, yPos, 195, yPos);
+            yPos += 10;
+
+            // Summary boxes
+            const boxWidth = 85;
+            const boxHeight = 20;
+
+            // Box 1: Total Earnings
+            doc.setFillColor(239, 246, 255);
+            doc.roundedRect(15, yPos, boxWidth, boxHeight, 2, 2, 'F');
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...lightGray);
+            doc.text('Total Earnings', 20, yPos + 6);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...textColor);
+            doc.text(formatCurrency(settlement.totalEarnings), 20, yPos + 14);
+
+            // Box 2: Instant Withdrawals
+            doc.setFillColor(254, 243, 199);
+            doc.roundedRect(110, yPos, boxWidth, boxHeight, 2, 2, 'F');
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...lightGray);
+            doc.text('Instant Withdrawals', 115, yPos + 6);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(234, 88, 12); // Orange
+            doc.text(formatCurrency(settlement.totalWithdrawals), 115, yPos + 14);
+
+            yPos += boxHeight + 5;
+
+            // Box 3: Net Settlement
+            doc.setFillColor(220, 252, 231);
+            doc.roundedRect(15, yPos, 180, boxHeight, 2, 2, 'F');
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...lightGray);
+            doc.text('Net Settlement (Payable by You)', 20, yPos + 6);
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(22, 163, 74); // Green
+            doc.text(formatCurrency(settlement.netSettlement), 20, yPos + 15);
+
+            yPos += boxHeight + 15;
+
+            // Breakdown Section
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...textColor);
+            doc.text('BREAKDOWN', 15, yPos);
+            yPos += 2;
+            doc.setDrawColor(...primaryColor);
+            doc.line(15, yPos, 195, yPos);
+            yPos += 10;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+
+            const breakdownItems = [
+                {
+                    title: '1. Total Wages Earned',
+                    amount: formatCurrency(settlement.totalEarnings),
+                    desc: `Total earned during ${settlement.month}`
+                },
+                {
+                    title: '2. Instant Withdrawals',
+                    amount: formatCurrency(settlement.totalWithdrawals),
+                    desc: `Paid via EarnedPay (${((settlement.totalWithdrawals / settlement.totalEarnings) * 100).toFixed(1)}%)`
+                },
+                {
+                    title: '3. Net Settlement',
+                    amount: formatCurrency(settlement.netSettlement),
+                    desc: 'Remaining balance to pay'
+                }
+            ];
+
+            breakdownItems.forEach((item) => {
+                doc.setFont('helvetica', 'bold');
+                doc.text(item.title, 20, yPos);
+                doc.setTextColor(...primaryColor);
+                doc.text(item.amount, 195, yPos, { align: 'right' });
+                yPos += 5;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(...lightGray);
+                doc.text(`• ${item.desc}`, 25, yPos);
+                yPos += 8;
+                doc.setFontSize(10);
+                doc.setTextColor(...textColor);
+            });
+
+            yPos += 5;
+
+            // Payment Instructions
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('PAYMENT INSTRUCTIONS', 15, yPos);
+            yPos += 2;
+            doc.setDrawColor(...primaryColor);
+            doc.line(15, yPos, 195, yPos);
+            yPos += 10;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Please pay ${formatCurrency(settlement.netSettlement)} to workers by payday.`, 20, yPos);
+            yPos += 10;
+            doc.setTextColor(...lightGray);
+            doc.setFontSize(9);
+            doc.text(`${formatCurrency(settlement.totalWithdrawals)} already paid via EarnedPay.`, 20, yPos);
+
+            // Footer
+            doc.setFillColor(249, 250, 251);
+            doc.rect(0, 270, 210, 27, 'F');
+            doc.setFontSize(8);
+            doc.setTextColor(...lightGray);
+            doc.text('This report is for record-keeping purposes only.', 105, 278, { align: 'center' });
+            doc.text(`Employees: ${settlement.totalWorkers || 0} | Amounts in ₹`, 105, 283, { align: 'center' });
+
+            // Save PDF
+            doc.save(`settlement-report-${settlement.month}.pdf`);
+        }).catch(() => {
+            alert('Failed to generate PDF. Please try again.');
+        });
     };
 
     if (loading || isLoadingData) {
@@ -116,7 +277,7 @@ export default function SettlementsPage() {
 
             <div className="space-y-4">
                 {settlements.map((settlement) => (
-                    <Card key={settlement.id} className="dark:bg-slate-800 border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                    <Card key={settlement.id || settlement.month} className="dark:bg-slate-800 border-l-4 border-l-primary hover:shadow-md transition-shadow">
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                 <div>
@@ -130,7 +291,7 @@ export default function SettlementsPage() {
                                             {settlement.status.toUpperCase()}
                                         </div>
                                     </div>
-                                    <CardDescription className="mt-1">{settlement.totalWorkers} Employees processed</CardDescription>
+                                    <CardDescription className="mt-1">{settlement.totalWorkers || 0} Employees processed</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
@@ -152,7 +313,11 @@ export default function SettlementsPage() {
 
                             <div className="flex justify-end gap-3">
                                 {settlement.status === 'completed' ? (
-                                    <Button variant="outline" className="gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2"
+                                        onClick={() => handleDownloadReport(settlement)}
+                                    >
                                         <Download className="w-4 h-4" />
                                         Download Report
                                     </Button>
@@ -167,10 +332,33 @@ export default function SettlementsPage() {
                 ))}
 
                 {settlements.length === 0 && !isLoadingData && (
-                    <div className="text-center py-16 bg-muted/10 rounded-xl border border-dashed">
-                        <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium">No settlements found</h3>
-                        <p className="text-muted-foreground">Settlement history will appear here after your first month.</p>
+                    <div className="text-center py-16 bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+                            <Clock className="w-10 h-10 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">No Settlements Yet</h3>
+                        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                            Your settlement history will appear here once you process your first monthly payroll.
+                        </p>
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 max-w-lg mx-auto text-left mb-6">
+                            <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                <span className="text-primary">💡</span> How it works:
+                            </p>
+                            <ol className="text-sm text-muted-foreground space-y-1 ml-6 list-decimal">
+                                <li>Submit attendance for your workers throughout the month</li>
+                                <li>Workers can withdraw up to their limit instantly</li>
+                                <li>On payday, process settlement to pay remaining balances</li>
+                                <li>Settlement records will appear here for your records</li>
+                            </ol>
+                        </div>
+                        <Button
+                            onClick={() => handleProcessSettlement(new Date().toISOString().slice(0, 7))}
+                            size="lg"
+                            className="gap-2"
+                        >
+                            <CheckCircle className="w-5 h-5" />
+                            Process Current Month Settlement
+                        </Button>
                     </div>
                 )}
             </div>

@@ -19,6 +19,7 @@ interface Balance {
     total_withdrawn: number;
     available_to_withdraw: number;
     max_withdrawable: number;
+    max_withdrawal_percentage: number;
     next_payday: string;
     payday_amount: number;
 }
@@ -190,7 +191,7 @@ export default function WorkerDashboard() {
                 </div>
 
                 {/* Setup Alert */}
-                {!loading && profile && !profile.upiId && (
+                {!loading && workerData && !workerData.upiId && (
                     <Link href="/worker/profile">
                         <Card className="bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 animate-pulse cursor-pointer">
                             <CardContent className="py-4 flex items-center justify-between">
@@ -446,11 +447,16 @@ export default function WorkerDashboard() {
                                 </div>
                             </div>
                             <div>
-                                <p className="font-semibold text-primary-900 dark:text-primary-100 mb-1">How it works</p>
+                                <p className="font-semibold text-primary-900 dark:text-primary-100 mb-1">Withdrawal Limit</p>
                                 <p className="text-sm text-primary-800 dark:text-gray-300 leading-relaxed">
-                                    You can withdraw up to 40% of your earned wages instantly via UPI.
+                                    Your employer allows you to withdraw up to <strong>{balance?.max_withdrawal_percentage || 40}%</strong> of your earned wages instantly via UPI.
                                     The remaining amount will be paid on your regular payday. No fees, no interest.
                                 </p>
+                                {balance && balance.max_withdrawal_percentage < 100 && (
+                                    <p className="text-xs text-primary-700 dark:text-primary-200 mt-2 italic">
+                                        💬 Need a higher limit? Contact your employer to request an increase.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </CardContent>

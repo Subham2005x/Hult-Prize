@@ -32,21 +32,24 @@ async def get_settlements(
     
     settlements = []
     for settlement_data in settlement_docs:
-        settlements.append(SettlementSummary(
+        settlement = SettlementSummary(
             month=settlement_data['month'],
+            total_workers=settlement_data.get('totalWorkers', 0),
             total_earnings=settlement_data['totalEarnings'],
             total_withdrawals=settlement_data['totalWithdrawals'],
             net_settlement=settlement_data['netSettlement'],
             settled_at=settlement_data['settledAt'],
             status=settlement_data['status']
-        ))
+        )
+        # Convert to dict with camelCase aliases
+        settlements.append(settlement.model_dump(by_alias=True))
     
     return {"settlements": settlements}
 
 
 @router.post("/process")
 async def process_settlement(
-    month: str,  # YYYY-MM format
+    request_body: dict,  # Accept month from request body
     current_user: dict = Depends(get_current_user)
 ):
     """Process monthly settlement"""
@@ -57,6 +60,7 @@ async def process_settlement(
         )
     
     employer_id = current_user["uid"]
+    month = request_body.get("month")  # Extract month from body
     
     # Get all workers for this employer
     workers = await mongodb_service.get_employer_workers(employer_id)

@@ -91,11 +91,26 @@ function LoginForm() {
                 useAuthStore.getState().setLoading(false);
             }
 
-            // Navigate to dashboard
+            // Navigate based on role
             if (actualRole === 'worker') {
                 router.replace('/worker/dashboard');
             } else if (actualRole === 'employer') {
-                router.replace('/employer/dashboard');
+                // Check if employer profile is complete
+                try {
+                    const employerProfile = await api.employer.getProfile(idToken);
+                    // Check if KYC data exists or if default company name is still set
+                    const hasKycData = employerProfile.kycData && Object.keys(employerProfile.kycData).length > 0;
+                    const isDefaultCompany = employerProfile.companyName === result.user.email?.split('@')[0] || employerProfile.companyName === "My Company";
+
+                    if (!hasKycData || isDefaultCompany) {
+                        router.replace('/employer/onboarding');
+                    } else {
+                        router.replace('/employer/dashboard');
+                    }
+                } catch (e) {
+                    console.error("Failed to check employer profile, redirecting to dashboard", e);
+                    router.replace('/employer/dashboard');
+                }
             } else {
                 setError('Unknown user role. Please contact support.');
                 setLoading(false);
@@ -132,11 +147,27 @@ function LoginForm() {
                 useAuthStore.getState().setLoading(false);
             }
 
-            // Navigate to dashboard
+            // Navigate based on role
             if (actualRole === 'worker') {
                 router.replace('/worker/dashboard');
             } else if (actualRole === 'employer') {
-                router.replace('/employer/dashboard');
+                // Check if employer profile is complete
+                try {
+                    const employerProfile = await api.employer.getProfile(idToken);
+                    // Check if KYC data exists or if default company name (email-based) is set
+                    const hasKycData = employerProfile.kycData && Object.keys(employerProfile.kycData).length > 0;
+                    // For phone login we don't have email easily accessible in the same way, but we can check if company name starts with "My Company" or is generic
+                    const isDefaultCompany = employerProfile.companyName === "My Company";
+
+                    if (!hasKycData || isDefaultCompany) {
+                        router.replace('/employer/onboarding');
+                    } else {
+                        router.replace('/employer/dashboard');
+                    }
+                } catch (e) {
+                    console.error("Failed to check employer profile, redirecting to dashboard", e);
+                    router.replace('/employer/dashboard');
+                }
             } else {
                 setError('Unknown user role. Please contact support.');
                 setLoading(false);

@@ -80,15 +80,34 @@ class WageCalculator:
         Returns:
             Next payday datetime
         """
-        from datetime import datetime
-        from dateutil.relativedelta import relativedelta
+        from datetime import datetime, timedelta
+        from calendar import monthrange
         
         now = datetime.utcnow()
-        current_month_payday = datetime(now.year, now.month, min(payday_date, 28))
         
-        if now.day >= payday_date:
+        # Get the max day in current month
+        _, max_day_in_month = monthrange(now.year, now.month)
+        # Use the minimum of payday_date and max days in month
+        actual_payday = min(payday_date, max_day_in_month)
+        
+        # Create current month's payday
+        try:
+            current_month_payday = datetime(now.year, now.month, actual_payday)
+        except ValueError:
+            # Fallback to last day of month if date is invalid
+            current_month_payday = datetime(now.year, now.month, max_day_in_month)
+        
+        if now.day >= actual_payday:
             # Next payday is next month
-            next_payday = current_month_payday + relativedelta(months=1)
+            next_month = now.month + 1 if now.month < 12 else 1
+            next_year = now.year if now.month < 12 else now.year + 1
+            _, max_day_next_month = monthrange(next_year, next_month)
+            actual_next_payday = min(payday_date, max_day_next_month)
+            
+            try:
+                next_payday = datetime(next_year, next_month, actual_next_payday)
+            except ValueError:
+                next_payday = datetime(next_year, next_month, max_day_next_month)
         else:
             # Next payday is this month
             next_payday = current_month_payday

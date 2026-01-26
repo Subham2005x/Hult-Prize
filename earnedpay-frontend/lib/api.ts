@@ -102,6 +102,11 @@ export const api = {
                 body: data,
                 token,
             }),
+        deleteWorker: (token: string, workerId: string) =>
+            apiRequest(`/api/employers/me/workers/${workerId}`, {
+                method: 'DELETE',
+                token,
+            }),
         submitAttendance: (token: string, data: any) =>
             apiRequest('/api/employers/attendance', {
                 method: 'POST',

@@ -14,28 +14,55 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(date: Date | string): string {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    return new Intl.DateTimeFormat('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    }).format(d);
+    try {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        // Check if date is valid
+        if (isNaN(d.getTime())) {
+            return '-';
+        }
+        return new Intl.DateTimeFormat('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        }).format(d);
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return '-';
+    }
 }
 
 export function formatDateTime(date: Date | string): string {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    return new Intl.DateTimeFormat('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(d);
+    try {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        // Check if date is valid
+        if (isNaN(d.getTime())) {
+            return '-';
+        }
+        return new Intl.DateTimeFormat('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(d);
+    } catch (error) {
+        console.error('Error formatting datetime:', error);
+        return '-';
+    }
 }
 
 export function getDaysUntil(date: Date | string): number {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    const now = new Date();
-    const diff = d.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    try {
+        const d = typeof date === 'string' ? new Date(date) : date;
+        // Check if date is valid
+        if (isNaN(d.getTime())) {
+            return 0;
+        }
+        const now = new Date();
+        const diff = d.getTime() - now.getTime();
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    } catch (error) {
+        console.error('Error calculating days until:', error);
+        return 0;
+    }
 }

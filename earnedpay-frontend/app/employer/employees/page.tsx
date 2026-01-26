@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Check input/label exist or just use basic HTML
-import { Plus, Search, Phone, Wallet, User } from 'lucide-react';
+import { Plus, Search, Phone, Wallet, User, Trash2 } from 'lucide-react';
 
 interface Worker {
     id: string;
@@ -76,6 +76,21 @@ export default function EmployeesPage() {
             alert(error.message || 'Failed to add worker');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteWorker = async (workerId: string, workerName: string) => {
+        if (!confirm(`Are you sure you want to delete ${workerName}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            await api.employer.deleteWorker(token!, workerId);
+            alert('Worker deleted successfully!');
+            fetchWorkers(); // Refresh list
+        } catch (error: any) {
+            console.error(error);
+            alert(error.message || 'Failed to delete worker');
         }
     };
 
@@ -160,7 +175,7 @@ export default function EmployeesPage() {
                 {workers.map((worker) => (
                     <Card key={worker.id} className="hover:shadow-md transition-shadow dark:bg-slate-800">
                         <CardContent className="p-6">
-                            <div className="flex items-start justify-between">
+                            <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center font-bold text-primary-700 dark:text-primary-300 text-lg">
                                         {worker.fullName.charAt(0)}
@@ -170,16 +185,33 @@ export default function EmployeesPage() {
                                         <p className="text-sm text-gray-500">{worker.phoneNumber}</p>
                                     </div>
                                 </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteWorker(worker.id, worker.fullName)}
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
                             </div>
 
-                            <div className="mt-6 flex items-center justify-between pt-4 border-t">
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className={`px-2 py-1 rounded-full text-xs font-semibold ${worker.isActive
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                                    }`}>
+                                    {worker.isActive ? 'Active' : 'Inactive'}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-4 border-t">
                                 <div className="text-sm">
-                                    <p className="text-muted-foreground">Earnings</p>
-                                    <p className="font-semibold text-lg">₹{worker.currentMonthEarnings}</p>
+                                    <p className="text-muted-foreground">This Month</p>
+                                    <p className="font-semibold text-lg">₹{worker.currentMonthEarnings.toLocaleString('en-IN')}</p>
                                 </div>
                                 <div className="text-right text-sm">
                                     <p className="text-muted-foreground">UPI ID</p>
-                                    <p className="font-mono">{worker.upiId || 'Not set'}</p>
+                                    <p className="font-mono text-xs">{worker.upiId || 'Not set'}</p>
                                 </div>
                             </div>
                         </CardContent>
